@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Big Wall</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #d4d0c8; margin: 0; padding: 10px; font-size: 13px; }
+    #container { max-width: 1200px; margin: 0 auto; display: flex; gap: 10px; }
+    #sidebar { width: 200px; flex-shrink: 0; }
+    #wrap { flex: 1; min-width: 0; }
+    h1 { font-size: 28px; margin: 0 0 4px 0; color: #222; }
+    hr { border: none; border-top: 1px solid #999; margin: 8px 0; }
+    input, textarea, button, select { font-family: Arial, sans-serif; font-size: 13px; }
+    input[type=text], input[type=email], input[type=password], textarea, select { width: 100%; padding: 4px; border: 1px solid #999; background: #fff; box-sizing: border-box; margin-bottom: 6px; }
+    textarea { min-height: 100px; resize: vertical; }
+    button { padding: 4px 12px; border: 1px solid #666; background: #e0ddd8; cursor: pointer; }
+    button:hover { background: #ccc; }
+    .box { background: #eae8e0; border: 1px solid #999; padding: 10px; margin-bottom: 8px; }
+    .post { background: #f5f4f0; border: 1px solid #aaa; padding: 8px 10px; margin-bottom: 6px; }
+    .post-title { font-size: 15px; font-weight: bold; color: #333; cursor: pointer; }
+    .post-title:hover { text-decoration: underline; }
+    .meta { color: #777; font-size: 11px; }
+    .author-link { color: #555; font-weight: bold; cursor: pointer; text-decoration: underline; }
+    .tag { display: inline-block; border: 1px solid #aaa; background: #dddbd6; padding: 1px 6px; font-size: 11px; margin-right: 4px; }
+    .comment { border-left: 3px solid #bbb; padding: 4px 8px; margin-bottom: 6px; background: #ededeb; position: relative; }
+    .comment.pinned { border-left-color: #cc9900; background: #fff9e6; }
+    .pin-badge { background: #cc9900; color: white; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 3px; margin-left: 6px; }
+    .reply { border-left: 3px solid #ccc; padding: 4px 8px; margin: 4px 0 0 16px; background: #f0f0ee; }
+    .modal-bg { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; overflow-y: auto; }
+    .modal { background: #eae8e0; border: 1px solid #999; max-width: 760px; margin: 30px auto; padding: 16px; }
+    .error { color: #aa2200; font-size: 12px; margin-bottom: 6px; }
+    label { display: block; font-size: 12px; color: #444; margin-bottom: 2px; }
+    .del-btn { color: #aa2200; background: none; border: none; cursor: pointer; font-size: 11px; padding: 0; }
+    .del-btn:hover { text-decoration: underline; background: none; }
+    .edit-btn { color: #555; background: none; border: none; cursor: pointer; font-size: 11px; padding: 0; margin-right: 6px; }
+    .edit-btn:hover { text-decoration: underline; background: none; }
+    .pin-btn { color: #cc9900; background: none; border: none; cursor: pointer; font-size: 11px; padding: 0; margin-left: 8px; }
+    .pin-btn:hover { text-decoration: underline; background: none; }
+    .pagination { margin-top: 8px; }
+    .pagination button { padding: 3px 10px; margin-right: 4px; }
+    .search-row { display: flex; gap: 6px; margin-bottom: 8px; }
+    .search-row input { margin-bottom: 0; }
+    .search-row select { width: auto; margin-bottom: 0; }
+    .search-row button { white-space: nowrap; }
+    
+    /* Friends sidebar */
+    .friends-box { background: #eae8e0; border: 1px solid #999; padding: 10px; margin-bottom: 8px; }
+    .friend-item { background: #f5f4f0; border: 1px solid #aaa; padding: 6px; margin-bottom: 4px; cursor: pointer; }
+    .friend-item:hover { background: #ececea; }
+    .friend-name { font-weight: bold; color: #333; font-size: 12px; }
+    .friend-recent { color: #777; font-size: 10px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    /* Notification styles */
+    .notif-btn { position: relative; padding: 4px 12px; }
+    .notif-badge { position: absolute; top: -4px; right: -4px; background: #cc0000; color: white; border-radius: 10px; padding: 2px 6px; font-size: 10px; font-weight: bold; }
+    .notif-item { background: #f5f4f0; border: 1px solid #aaa; padding: 6px 8px; margin-bottom: 4px; cursor: pointer; }
+    .notif-item:hover { background: #ececea; }
+    .notif-item.unread { background: #fff9e6; border-color: #cc9900; }
+    .notif-time { color: #999; font-size: 10px; margin-left: 6px; }
+    
+    /* Profile enhancements */
+    .profile-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .profile-avatar { width: 60px; height: 60px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; color: white; border: 1px solid #999; }
+    .profile-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .profile-stat { background: #f5f4f0; border: 1px solid #aaa; padding: 8px; text-align: center; }
+    .profile-stat-value { font-size: 18px; font-weight: bold; color: #333; }
+    .profile-stat-label { font-size: 11px; color: #777; }
+    .profile-bio { background: #f5f4f0; border: 1px solid #aaa; padding: 8px; margin-bottom: 12px; white-space: pre-wrap; font-style: italic; color: #555; }
+    
+    /* @ mention autocomplete */
+    .mention-dropdown { position: absolute; background: #fff; border: 1px solid #999; max-height: 150px; overflow-y: auto; z-index: 1000; display: none; }
+    .mention-item { padding: 4px 8px; cursor: pointer; font-size: 12px; }
+    .mention-item:hover { background: #e0ddd8; }
+    .mention-item.selected { background: #d0cdc8; }
+    .mention-highlight { background: #fff9e6; color: #cc9900; font-weight: bold; }
+    
+    @media (max-width: 800px) {
+      #container { flex-direction: column; }
+      #sidebar { width: 100%; order: 2; }
+    }
+  </style>
+</head>
+<body>
+<div id="container">
+  <!-- Friends Sidebar -->
+  <div id="sidebar" style="display:none;">
+    <div class="friends-box">
+      <b style="font-size: 14px;">Friends</b>
+      <hr>
+      <div id="friends-list"></div>
+    </div>
+  </div>
+
+  <div id="wrap">
+    <div class="box">
+      <h1>BIG WALL</h1>
+      <span class="meta">The classic forum &mdash; post anything</span>
+    </div>
+
+    <!-- auth bar with notifications -->
+    <div id="auth-bar" class="box" style="display:none;">
+      <span>Signed in as <span id="user-label" class="author-link" onclick="viewOwnProfile()"></span></span>
+      &nbsp;&nbsp;<button class="notif-btn" onclick="openNotifications()">Notifications<span id="notif-badge" class="notif-badge" style="display:none;"></span></button>
+      &nbsp;<button onclick="openChangeNameModal()">Change Name</button>
+      &nbsp;<button onclick="openEditProfile()">Edit Profile</button>
+      &nbsp;<button onclick="doSignOut()">Sign Out</button>
+    </div>
+
+    <!-- login / register -->
+    <div id="login-box" class="box" style="display:none;">
+      <b id="auth-title">Sign In</b>
+      <hr>
+      <div id="auth-error" class="error" style="display:none;"></div>
+      <div id="reg-fields" style="display:none;">
+        <label>Display Name</label>
+        <input type="text" id="reg-name" maxlength="30">
+      </div>
+      <label>Email</label>
+      <input type="email" id="auth-email">
+      <label>Password</label>
+      <input type="password" id="auth-pass">
+      <button onclick="submitAuth()" id="auth-btn">Sign In</button>
+      &nbsp;
+      <span class="meta" id="toggle-msg">No account?</span>
+      <a href="#" onclick="toggleMode(); return false;" id="toggle-link">Register</a>
+    </div>
+
+    <!-- new post -->
+    <div id="post-box" class="box" style="display:none;">
+      <b>New Post</b>
+      <hr>
+      <label>Title</label>
+      <input type="text" id="post-title" maxlength="500">
+      <div class="meta" style="text-align:right; margin-top:-4px; margin-bottom:6px;"><span id="title-count">0</span>/500</div>
+      <label>Body</label>
+      <textarea id="post-body" maxlength="8000"></textarea>
+      <div class="meta" style="text-align:right; margin-top:-4px; margin-bottom:6px;"><span id="body-count">0</span>/8000</div>
+      <label>Tag</label>
+      <select id="post-tag">
+        <option value="general">general</option>
+        <option value="news">news</option>
+        <option value="random">random</option>
+        <option value="question">question</option>
+        <option value="rant">rant</option>
+      </select>
+      <button onclick="createPost()">Post</button>
+    </div>
+
+    <!-- search + sort -->
+    <div class="box">
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="Search by title or tag..." style="flex:1;">
+        <select id="sort-select" style="width:auto;">
+          <option value="new">Newest</option>
+          <option value="top">Top</option>
+          <option value="comments">Most Comments</option>
+        </select>
+        <button onclick="applySearch()">Search</button>
+        <button onclick="clearSearch()">Clear</button>
+      </div>
+    </div>
+
+    <div id="posts-area"><span class="meta">Loading...</span></div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+
+<!-- post modal -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <div style="text-align:right;"><a href="#" onclick="closeModal('modal-bg'); return false;">[close]</a></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- profile modal -->
+<div class="modal-bg" id="profile-bg">
+  <div class="modal">
+    <div style="text-align:right;"><a href="#" onclick="closeModal('profile-bg'); return false;">[close]</a></div>
+    <div id="profile-body"></div>
+  </div>
+</div>
+
+<!-- notifications modal -->
+<div class="modal-bg" id="notif-bg">
+  <div class="modal" style="max-width:500px;">
+    <div style="text-align:right;"><a href="#" onclick="closeModal('notif-bg'); return false;">[close]</a></div>
+    <b style="font-size:16px;">Notifications</b>
+    <hr>
+    <div id="notif-body"></div>
+  </div>
+</div>
+
+<!-- change name modal -->
+<div class="modal-bg" id="name-bg">
+  <div class="modal" style="max-width:400px;">
+    <div style="text-align:right;"><a href="#" onclick="closeModal('name-bg'); return false;">[close]</a></div>
+    <b>Change Display Name</b>
+    <hr>
+    <div id="name-error" class="error" style="display:none;"></div>
+    <label>New Display Name</label>
+    <input type="text" id="new-name-input" maxlength="30">
+    <button onclick="saveNewName()">Save</button>
+  </div>
+</div>
+
+<!-- edit profile modal -->
+<div class="modal-bg" id="edit-profile-bg">
+  <div class="modal" style="max-width:500px;">
+    <div style="text-align:right;"><a href="#" onclick="closeModal('edit-profile-bg'); return false;">[close]</a></div>
+    <b>Edit Profile</b>
+    <hr>
+    <label>Bio (max 200 characters)</label>
+    <textarea id="bio-input" maxlength="200" style="min-height:80px;" placeholder="Tell us about yourself..."></textarea>
+    <div class="meta" style="text-align:right; margin-top:-4px; margin-bottom:6px;"><span id="bio-count">0</span>/200</div>
+    <label>Profile Color</label>
+    <select id="color-input">
+      <option value="#6b8e23">Olive Green</option>
+      <option value="#4682b4">Steel Blue</option>
+      <option value="#8b4513">Saddle Brown</option>
+      <option value="#483d8b">Dark Slate Blue</option>
+      <option value="#2f4f4f">Dark Slate Gray</option>
+      <option value="#8b0000">Dark Red</option>
+      <option value="#556b2f">Dark Olive Green</option>
+      <option value="#191970">Midnight Blue</option>
+      <option value="#ff0000">Eye Killing Red</option>
+      <option value="#292929">Boring</option>
+    </select>
+    <button onclick="saveProfile()">Save Profile</button>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut as fbSignOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+  import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove, serverTimestamp, getDoc, getDocs, setDoc, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+  const app = initializeApp({
+    apiKey: "AIzaSyDe7NHq3dS3UWI2ldlBzyG8Sz05RtbXKN4",
+    authDomain: "big-wall-a7295.firebaseapp.com",
+    projectId: "big-wall-a7295",
+    storageBucket: "big-wall-a7295.firebasestorage.app",
+    messagingSenderId: "751220576922",
+    appId: "1:751220576922:web:3b38beaeee91333d3a8523"
+  });
+
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  let currentUser = null;
+  let currentUserName = null;
+  let isRegister = false;
+  let allPosts = [];
+  let filteredPosts = [];
+  let currentPage = 0;
+  const PAGE_SIZE = 10;
+  window.currentPostId = null;
+  let friends = [];
+  let friendRequests = { sent: [], received: [] };
+
+  // --- Auth ---
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      currentUser = user;
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      if (snap.exists()) {
+        currentUserName = snap.data().displayName;
+      } else {
+        currentUserName = user.email;
+        await setDoc(doc(db, 'users', user.uid), { 
+          displayName: user.email, 
+          createdAt: serverTimestamp(),
+          bio: '',
+          profileColor: '#6b8e23',
+          friends: [],
+          friendRequestsSent: [],
+          friendRequestsReceived: []
+        });
+      }
+      document.getElementById('user-label').textContent = currentUserName;
+      document.getElementById('auth-bar').style.display = 'block';
+      document.getElementById('login-box').style.display = 'none';
+      document.getElementById('post-box').style.display = 'block';
+      document.getElementById('sidebar').style.display = 'block';
+      
+      // Listen for notifications and friends
+      listenToNotifications(user.uid);
+      listenToFriends(user.uid);
+    } else {
+      currentUser = null;
+      currentUserName = null;
+      document.getElementById('auth-bar').style.display = 'none';
+      document.getElementById('login-box').style.display = 'block';
+      document.getElementById('post-box').style.display = 'none';
+      document.getElementById('sidebar').style.display = 'none';
+    }
+  });
+
+  window.submitAuth = async () => {
+    const email = document.getElementById('auth-email').value.trim();
+    const pass = document.getElementById('auth-pass').value;
+    const err = document.getElementById('auth-error');
+    err.style.display = 'none';
+    if (!email || !pass) { showErr('auth-error', 'Email and password required.'); return; }
+    try {
+      if (isRegister) {
+        const name = document.getElementById('reg-name').value.trim() || email;
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        await setDoc(doc(db, 'users', cred.user.uid), { 
+          displayName: name, 
+          createdAt: serverTimestamp(),
+          bio: '',
+          profileColor: '#6b8e23',
+          friends: [],
+          friendRequestsSent: [],
+          friendRequestsReceived: []
+        });
+      } else {
+        await signInWithEmailAndPassword(auth, email, pass);
+      }
+    } catch (e) {
+      showErr('auth-error', e.message);
+    }
+  };
+
+  window.toggleMode = () => {
+    isRegister = !isRegister;
+    document.getElementById('auth-title').textContent = isRegister ? 'Register' : 'Sign In';
+    document.getElementById('auth-btn').textContent = isRegister ? 'Register' : 'Sign In';
+    document.getElementById('reg-fields').style.display = isRegister ? 'block' : 'none';
+    document.getElementById('toggle-msg').textContent = isRegister ? 'Have an account?' : 'No account?';
+    document.getElementById('toggle-link').textContent = isRegister ? 'Sign In' : 'Register';
+  };
+
+  window.doSignOut = async () => {
+    await fbSignOut(auth);
+  };
+
+  window.openChangeNameModal = () => {
+    document.getElementById('new-name-input').value = '';
+    document.getElementById('name-error').style.display = 'none';
+    document.getElementById('name-bg').style.display = 'block';
+  };
+
+  window.saveNewName = async () => {
+    const name = document.getElementById('new-name-input').value.trim();
+    if (!name) { showErr('name-error', 'Name cannot be empty.'); return; }
+    await updateDoc(doc(db, 'users', currentUser.uid), { displayName: name });
+    currentUserName = name;
+    document.getElementById('user-label').textContent = name;
+    closeModal('name-bg');
+  };
+
+  // --- Edit Profile ---
+  window.openEditProfile = async () => {
+    const snap = await getDoc(doc(db, 'users', currentUser.uid));
+    if (snap.exists()) {
+      const data = snap.data();
+      document.getElementById('bio-input').value = data.bio || '';
+      document.getElementById('color-input').value = data.profileColor || '#6b8e23';
+      updateBioCount();
+    }
+    document.getElementById('edit-profile-bg').style.display = 'block';
+  };
+
+  window.saveProfile = async () => {
+    const bio = document.getElementById('bio-input').value.trim();
+    const color = document.getElementById('color-input').value;
+    await updateDoc(doc(db, 'users', currentUser.uid), { 
+      bio: bio,
+      profileColor: color
+    });
+    closeModal('edit-profile-bg');
+  };
+
+  document.getElementById('bio-input').addEventListener('input', updateBioCount);
+  function updateBioCount() {
+    const bioInput = document.getElementById('bio-input');
+    if (bioInput) {
+      document.getElementById('bio-count').textContent = bioInput.value.length;
+    }
+  }
+
+  // --- Friends System ---
+  async function listenToFriends(uid) {
+    onSnapshot(doc(db, 'users', uid), async (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      friends = data.friends || [];
+      friendRequests = {
+        sent: data.friendRequestsSent || [],
+        received: data.friendRequestsReceived || []
+      };
+      await renderFriendsList();
+    });
+  }
+
+  async function renderFriendsList() {
+    const el = document.getElementById('friends-list');
+    if (!friends.length) {
+      el.innerHTML = '<span class="meta">No friends yet</span>';
+      return;
+    }
+    
+    const friendsData = await Promise.all(friends.map(async (fid) => {
+      const userSnap = await getDoc(doc(db, 'users', fid));
+      if (!userSnap.exists()) return null;
+      const userData = userSnap.data();
+      
+      // Get their most recent post
+      const userPosts = allPosts.filter(p => p.authorId === fid);
+      const recentPost = userPosts.length > 0 ? userPosts[0].title : 'No posts yet';
+      
+      return { id: fid, name: userData.displayName, recentPost };
+    }));
+    
+    el.innerHTML = friendsData.filter(f => f).map(f => `
+      <div class="friend-item" onclick="openProfile('${f.id}', '${esc(f.name)}')">
+        <div class="friend-name">${esc(f.name)}</div>
+        <div class="friend-recent">${esc(f.recentPost)}</div>
+      </div>
+    `).join('');
+  }
+
+  window.sendFriendRequest = async (targetUid, targetName) => {
+    if (friends.includes(targetUid)) {
+      alert('Already friends!');
+      return;
+    }
+    if (friendRequests.sent.includes(targetUid)) {
+      alert('Request already sent!');
+      return;
+    }
+    
+    // Add to your sent list
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      friendRequestsSent: arrayUnion(targetUid)
+    });
+    
+    // Add to their received list
+    await updateDoc(doc(db, 'users', targetUid), {
+      friendRequestsReceived: arrayUnion(currentUser.uid)
+    });
+    
+    // Send notification
+    await createNotification(targetUid, `${currentUserName} sent you a friend request`, null, 'friend_request', currentUser.uid);
+    
+    alert('Friend request sent!');
+  };
+
+  window.acceptFriendRequest = async (requesterUid) => {
+    // Add each other to friends lists
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      friends: arrayUnion(requesterUid),
+      friendRequestsReceived: arrayRemove(requesterUid)
+    });
+    
+    await updateDoc(doc(db, 'users', requesterUid), {
+      friends: arrayUnion(currentUser.uid),
+      friendRequestsSent: arrayRemove(currentUser.uid)
+    });
+    
+    // Notify them
+    await createNotification(requesterUid, `${currentUserName} accepted your friend request!`, null, 'friend_accept');
+    
+    closeModal('profile-bg');
+  };
+
+  window.declineFriendRequest = async (requesterUid) => {
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      friendRequestsReceived: arrayRemove(requesterUid)
+    });
+    
+    await updateDoc(doc(db, 'users', requesterUid), {
+      friendRequestsSent: arrayRemove(currentUser.uid)
+    });
+    
+    closeModal('profile-bg');
+  };
+
+  window.removeFriend = async (friendUid) => {
+    if (!confirm('Remove this friend?')) return;
+    
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      friends: arrayRemove(friendUid)
+    });
+    
+    await updateDoc(doc(db, 'users', friendUid), {
+      friends: arrayRemove(currentUser.uid)
+    });
+    
+    closeModal('profile-bg');
+  };
+
+  // --- Notifications ---
+  function listenToNotifications(uid) {
+    const q = query(collection(db, 'notifications'), where('recipientId', '==', uid), orderBy('createdAt', 'desc'));
+    onSnapshot(q, (snap) => {
+      const unread = snap.docs.filter(d => !d.data().read).length;
+      const badge = document.getElementById('notif-badge');
+      if (unread > 0) {
+        badge.textContent = unread;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    });
+  }
+
+  window.openNotifications = async () => {
+    document.getElementById('notif-body').innerHTML = '<span class="meta">Loading...</span>';
+    document.getElementById('notif-bg').style.display = 'block';
+    
+    const q = query(collection(db, 'notifications'), where('recipientId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    
+    if (snap.empty) {
+      document.getElementById('notif-body').innerHTML = '<span class="meta">No notifications yet.</span>';
+      return;
+    }
+    
+    const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    document.getElementById('notif-body').innerHTML = notifs.map(n => {
+      const timeAgo = n.createdAt ? getTimeAgo(n.createdAt.seconds * 1000) : 'just now';
+      let clickAction = n.postId ? `handleNotifClick('${n.id}', '${n.postId}', '')` : 
+                        n.type === 'friend_request' ? `handleNotifClick('${n.id}', '', '${n.requesterId}')` : 
+                        `markNotifRead('${n.id}')`;
+      return `
+        <div class="notif-item ${n.read ? '' : 'unread'}" onclick="${clickAction}">
+          ${esc(n.message)}
+          <span class="notif-time">${timeAgo}</span>
+        </div>
+      `;
+    }).join('');
+    
+    // Mark all as read
+    for (const d of snap.docs) {
+      if (!d.data().read) {
+        await updateDoc(doc(db, 'notifications', d.id), { read: true });
+      }
+    }
+  };
+
+  window.handleNotifClick = async (notifId, postId, requesterId) => {
+    closeModal('notif-bg');
+    if (postId) {
+      openPost(postId);
+    } else if (requesterId) {
+      const userSnap = await getDoc(doc(db, 'users', requesterId));
+      const name = userSnap.exists() ? userSnap.data().displayName : 'User';
+      openProfile(requesterId, name);
+    }
+  };
+
+  window.markNotifRead = async (notifId) => {
+    await updateDoc(doc(db, 'notifications', notifId), { read: true });
+  };
+
+  function getTimeAgo(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+
+  async function createNotification(recipientId, message, postId = null, type = 'default', requesterId = null) {
+    if (recipientId === currentUser.uid) return;
+    await addDoc(collection(db, 'notifications'), {
+      recipientId,
+      message,
+      postId,
+      type,
+      requesterId,
+      createdAt: serverTimestamp(),
+      read: false
+    });
+  }
+
+  // --- Posts ---
+  const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+  onSnapshot(q, (snap) => {
+    allPosts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    applyFilters();
+    renderFriendsList(); // Update friends' recent posts
+  });
+
+  window.createPost = async () => {
+    const title = document.getElementById('post-title').value.trim();
+    const content = document.getElementById('post-body').value.trim();
+    const tag = document.getElementById('post-tag').value;
+    if (!title || !content) return alert('Title and body required.');
+    await addDoc(collection(db, 'posts'), {
+      title, content, tag,
+      authorId: currentUser.uid,
+      authorName: currentUserName,
+      createdAt: serverTimestamp(),
+      upvotes: [],
+      downvotes: [],
+      comments: [],
+      pinnedComment: null
+    });
+    document.getElementById('post-title').value = '';
+    document.getElementById('post-body').value = '';
+    updateCharCounts();
+  };
+
+  document.getElementById('post-title').addEventListener('input', updateCharCounts);
+  document.getElementById('post-body').addEventListener('input', updateCharCounts);
+  function updateCharCounts() {
+    document.getElementById('title-count').textContent = document.getElementById('post-title').value.length;
+    document.getElementById('body-count').textContent = document.getElementById('post-body').value.length;
+  }
+
+  window.vote = async (id, type) => {
+    if (!currentUser) return;
+    const ref = doc(db, 'posts', id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const uid = currentUser.uid;
+    const upvotes = data.upvotes || [];
+    const downvotes = data.downvotes || [];
+    const isUp = upvotes.includes(uid);
+    const isDn = downvotes.includes(uid);
+    
+    const isNewUpvote = type === 'up' && !isUp;
+    
+    if (type === 'up') {
+      if (isUp) await updateDoc(ref, { upvotes: arrayRemove(uid) });
+      else {
+        await updateDoc(ref, { upvotes: arrayUnion(uid), downvotes: arrayRemove(uid) });
+        if (isNewUpvote) {
+          await createNotification(data.authorId, `${currentUserName} upvoted your post: "${data.title}"`, id);
+        }
+      }
+    } else {
+      if (isDn) await updateDoc(ref, { downvotes: arrayRemove(uid) });
+      else await updateDoc(ref, { downvotes: arrayUnion(uid), upvotes: arrayRemove(uid) });
+    }
+    if (window.currentPostId === id) openPost(id);
+  };
+
+  window.deletePost = async (id) => {
+    if (!confirm('Delete this post?')) return;
+    await deleteDoc(doc(db, 'posts', id));
+  };
+
+  // --- Filters ---
+  window.applySearch = () => { applyFilters(); };
+  window.clearSearch = () => {
+    document.getElementById('search-input').value = '';
+    document.getElementById('sort-select').value = 'new';
+    applyFilters();
+  };
+
+  function applyFilters() {
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    const sortMode = document.getElementById('sort-select').value;
+    let posts = [...allPosts];
+    if (searchTerm) {
+      posts = posts.filter(p => 
+        p.title.toLowerCase().includes(searchTerm) || 
+        (p.tag && p.tag.toLowerCase().includes(searchTerm))
+      );
+    }
+    if (sortMode === 'top') {
+      posts.sort((a, b) => {
+        const aScore = (a.upvotes?.length || 0) - (a.downvotes?.length || 0);
+        const bScore = (b.upvotes?.length || 0) - (b.downvotes?.length || 0);
+        return bScore - aScore;
+      });
+    } else if (sortMode === 'comments') {
+      posts.sort((a, b) => (b.comments?.length || 0) - (a.comments?.length || 0));
+    }
+    filteredPosts = posts;
+    currentPage = 0;
+    renderPosts();
+  }
+
+  function renderPosts() {
+    const start = currentPage * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    const page = filteredPosts.slice(start, end);
+    if (!page.length) {
+      document.getElementById('posts-area').innerHTML = '<span class="meta">No posts found.</span>';
+      document.getElementById('pagination').innerHTML = '';
+      return;
+    }
+    document.getElementById('posts-area').innerHTML = page.map(p => {
+      const score = (p.upvotes?.length || 0) - (p.downvotes?.length || 0);
+      const ts = p.createdAt ? new Date(p.createdAt.seconds * 1000).toLocaleString() : 'just now';
+      return `
+        <div class="post">
+          <div class="post-title" onclick="openPost('${p.id}')">${esc(p.title)}</div>
+          <div class="meta">
+            <span class="tag">${esc(p.tag || 'general')}</span>
+            by <span class="author-link" onclick="openProfile('${esc(p.authorId)}','${esc(p.authorName)}')">${esc(p.authorName)}</span>
+            &bull; ${ts} &bull; score: ${score} &bull; ${p.comments?.length || 0} comments
+          </div>
+        </div>
+      `;
+    }).join('');
+    renderPagination();
+  }
+
+  function renderPagination() {
+    const total = Math.ceil(filteredPosts.length / PAGE_SIZE);
+    if (total <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+    let html = '';
+    for (let i = 0; i < total; i++) {
+      const style = i === currentPage ? 'font-weight:bold;' : '';
+      html += `<button style="${style}" onclick="goToPage(${i})">${i + 1}</button>`;
+    }
+    document.getElementById('pagination').innerHTML = html;
+  }
+
+  window.goToPage = (p) => { currentPage = p; renderPosts(); };
+
+  // --- Post Detail ---
+  window.openPost = async (id) => {
+    window.currentPostId = id;
+    const snap = await getDoc(doc(db, 'posts', id));
+    if (!snap.exists()) { alert('Post not found.'); return; }
+    const post = snap.data();
+    const score = (post.upvotes?.length || 0) - (post.downvotes?.length || 0);
+    const ts = post.createdAt ? new Date(post.createdAt.seconds * 1000).toLocaleString() : 'just now';
+    const isUp = currentUser && post.upvotes?.includes(currentUser.uid);
+    const isDn = currentUser && post.downvotes?.includes(currentUser.uid);
+    const isOwner = currentUser && currentUser.uid === post.authorId;
+
+    document.getElementById('modal-body').innerHTML = `
+      <b style="font-size:16px;">${esc(post.title)}</b>
+      <div class="meta" style="margin:4px 0 10px;">
+        <span class="tag">${esc(post.tag || 'general')}</span>
+        by <span class="author-link" onclick="openProfile('${esc(post.authorId)}','${esc(post.authorName)}')">${esc(post.authorName)}</span>
+        &bull; ${ts}${post.edited ? ' <i>(edited)</i>' : ''}
+      </div>
+      <div style="white-space:pre-wrap; line-height:1.5; color:#333; margin-bottom:12px;">${linkify(esc(post.content))}</div>
+      <div>
+        <button onclick="vote('${id}','up')" ${isUp ? 'style="font-weight:bold;"' : ''}>+ up</button>
+        <b style="margin:0 6px;">${score}</b>
+        <button onclick="vote('${id}','down')" ${isDn ? 'style="font-weight:bold;"' : ''}>- down</button>
+        ${isOwner ? `<button class="del-btn" style="margin-left:12px;" onclick="deletePost('${id}'); closeModal('modal-bg');">delete post</button>` : ''}
+      </div>
+      <hr>
+      <b>Comments (${post.comments?.length || 0})</b>
+      <div id="comment-list" style="margin-top:8px;"></div>
+      ${currentUser
+        ? `<div style="margin-top:8px; position:relative;">
+             <textarea id="comment-input" maxlength="2000" style="min-height:60px;" placeholder="Write a comment... (@mention friends)"></textarea>
+             <div class="mention-dropdown" id="mention-dropdown"></div>
+             <button onclick="addComment()">Post Comment</button>
+           </div>`
+        : '<span class="meta">Sign in to comment.</span>'}
+    `;
+    renderComments(post.comments || [], id, post.pinnedComment);
+    document.getElementById('modal-bg').style.display = 'block';
+    
+    if (currentUser) {
+      setupMentionAutocomplete('comment-input');
+    }
+  };
+
+  // --- @ Mention Autocomplete ---
+  function setupMentionAutocomplete(textareaId) {
+    const textarea = document.getElementById(textareaId);
+    const dropdown = document.getElementById('mention-dropdown');
+    let selectedIndex = -1;
+    
+    textarea.addEventListener('input', async (e) => {
+      const text = e.target.value;
+      const cursorPos = e.target.selectionStart;
+      const textBeforeCursor = text.substring(0, cursorPos);
+      const match = textBeforeCursor.match(/@(\w*)$/);
+      
+      if (match && friends.length > 0) {
+        const searchTerm = match[1].toLowerCase();
+        const friendsData = await Promise.all(friends.map(async (fid) => {
+          const snap = await getDoc(doc(db, 'users', fid));
+          return snap.exists() ? { id: fid, name: snap.data().displayName } : null;
+        }));
+        
+        const filtered = friendsData.filter(f => f && f.name.toLowerCase().includes(searchTerm));
+        
+        if (filtered.length > 0) {
+          selectedIndex = 0;
+          dropdown.innerHTML = filtered.map((f, i) => 
+            `<div class="mention-item ${i === 0 ? 'selected' : ''}" data-name="${esc(f.name)}" data-index="${i}">${esc(f.name)}</div>`
+          ).join('');
+          dropdown.style.display = 'block';
+          
+          const rect = textarea.getBoundingClientRect();
+          dropdown.style.left = rect.left + 'px';
+          dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+          dropdown.style.width = rect.width + 'px';
+          
+          dropdown.querySelectorAll('.mention-item').forEach(item => {
+            item.addEventListener('click', () => {
+              insertMention(textarea, item.dataset.name, match[0].length);
+            });
+          });
+        } else {
+          dropdown.style.display = 'none';
+        }
+      } else {
+        dropdown.style.display = 'none';
+      }
+    });
+    
+    textarea.addEventListener('keydown', (e) => {
+      if (dropdown.style.display === 'none') return;
+      
+      const items = dropdown.querySelectorAll('.mention-item');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+        updateSelection(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedIndex = Math.max(selectedIndex - 1, 0);
+        updateSelection(items);
+      } else if (e.key === 'Enter' && selectedIndex >= 0) {
+        e.preventDefault();
+        const selected = items[selectedIndex];
+        insertMention(textarea, selected.dataset.name, textarea.value.substring(0, textarea.selectionStart).match(/@(\w*)$/)[0].length);
+      } else if (e.key === 'Escape') {
+        dropdown.style.display = 'none';
+      }
+    });
+    
+    function updateSelection(items) {
+      items.forEach((item, i) => {
+        item.classList.toggle('selected', i === selectedIndex);
+      });
+    }
+    
+    function insertMention(textarea, name, matchLength) {
+      const pos = textarea.selectionStart;
+      const before = textarea.value.substring(0, pos - matchLength);
+      const after = textarea.value.substring(pos);
+      textarea.value = before + '@' + name + ' ' + after;
+      textarea.selectionStart = textarea.selectionEnd = pos - matchLength + name.length + 2;
+      dropdown.style.display = 'none';
+      textarea.focus();
+    }
+  }
+
+  // Process mentions in text
+  function processMentions(text) {
+    return text.replace(/@(\w+)/g, '<span class="mention-highlight">@$1</span>');
+  }
+
+  async function notifyMentionedUsers(text, postId, postTitle) {
+    const mentions = text.match(/@(\w+)/g);
+    if (!mentions) return;
+    
+    for (const mention of mentions) {
+      const username = mention.substring(1);
+      // Find friend with this name
+      for (const fid of friends) {
+        const snap = await getDoc(doc(db, 'users', fid));
+        if (snap.exists() && snap.data().displayName === username) {
+          await createNotification(fid, `${currentUserName} mentioned you in "${postTitle}"`, postId);
+        }
+      }
+    }
+  }
+
+  // --- Comments ---
+  function renderComments(comments, postId, pinnedCommentIndex) {
+    const el = document.getElementById('comment-list');
+    if (!el) return;
+    const postSnap = allPosts.find(p => p.id === postId);
+    const isOwner = currentUser && postSnap && currentUser.uid === postSnap.authorId;
+    
+    if (!comments.length) { 
+      el.innerHTML = '<span class="meta">No comments yet.</span>'; 
+      return; 
+    }
+    
+    // Separate pinned and regular comments
+    let orderedComments = [...comments.map((c, i) => ({ ...c, originalIndex: i }))];
+    let pinnedComment = null;
+    
+    if (pinnedCommentIndex !== null && pinnedCommentIndex !== undefined) {
+      pinnedComment = orderedComments.find(c => c.originalIndex === pinnedCommentIndex);
+      orderedComments = orderedComments.filter(c => c.originalIndex !== pinnedCommentIndex);
+    }
+    
+    const renderComment = (c, isPinned = false) => `
+      <div class="comment ${isPinned ? 'pinned' : ''}">
+        <span class="author-link" onclick="openProfile('${esc(c.authorId)}','${esc(c.authorName)}')">${esc(c.authorName)}</span>
+        ${isPinned ? '<span class="pin-badge">PINNED</span>' : ''}
+        <span class="meta"> &bull; ${new Date(c.createdAt).toLocaleString()}</span>
+        ${currentUser && currentUser.uid === c.authorId ? `<button class="del-btn" style="margin-left:8px;" onclick="deleteComment(${c.originalIndex})">delete</button>` : ''}
+        ${isOwner && !isPinned ? `<button class="pin-btn" onclick="pinComment(${c.originalIndex})">pin</button>` : ''}
+        ${isOwner && isPinned ? `<button class="pin-btn" onclick="unpinComment()">unpin</button>` : ''}
+        <div style="margin-top:3px; white-space:pre-wrap;">${processMentions(linkify(esc(c.text)))}</div>
+        ${currentUser ? `<div style="margin-top:4px;"><a href="#" onclick="toggleReplyBox(${c.originalIndex}); return false;" style="font-size:11px; color:#666;">reply</a></div>
+        <div id="reply-box-${c.originalIndex}" style="display:none; margin-top:4px; position:relative;">
+          <textarea id="reply-input-${c.originalIndex}" maxlength="1000" style="min-height:50px;" placeholder="Write a reply... (@mention friends)"></textarea>
+          <div class="mention-dropdown" id="mention-dropdown-${c.originalIndex}"></div>
+          <button onclick="addReply(${c.originalIndex})">Reply</button>
+        </div>` : ''}
+        <div id="replies-${c.originalIndex}">
+          ${(c.replies || []).map((r, ri) => `
+            <div class="reply">
+              <span class="author-link" onclick="openProfile('${esc(r.authorId)}','${esc(r.authorName)}')">${esc(r.authorName)}</span>
+              <span class="meta"> &bull; ${new Date(r.createdAt).toLocaleString()}</span>
+              ${currentUser && currentUser.uid === r.authorId ? `<button class="del-btn" style="margin-left:8px;" onclick="deleteReply(${c.originalIndex},${ri})">delete</button>` : ''}
+              <div style="margin-top:2px; white-space:pre-wrap;">${processMentions(linkify(esc(r.text)))}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    
+    let html = '';
+    if (pinnedComment) {
+      html += renderComment(pinnedComment, true);
+    }
+    html += orderedComments.map(c => renderComment(c)).join('');
+    el.innerHTML = html;
+  }
+
+  window.toggleReplyBox = (i) => {
+    const box = document.getElementById(`reply-box-${i}`);
+    const isShowing = box.style.display !== 'none';
+    box.style.display = isShowing ? 'none' : 'block';
+    if (!isShowing) {
+      setupMentionAutocomplete(`reply-input-${i}`, `mention-dropdown-${i}`);
+    }
+  };
+
+  window.pinComment = async (index) => {
+    const ref = doc(db, 'posts', window.currentPostId);
+    await updateDoc(ref, { pinnedComment: index });
+    const updated = (await getDoc(ref)).data();
+    renderComments(updated.comments || [], window.currentPostId, updated.pinnedComment);
+  };
+
+  window.unpinComment = async () => {
+    const ref = doc(db, 'posts', window.currentPostId);
+    await updateDoc(ref, { pinnedComment: null });
+    const updated = (await getDoc(ref)).data();
+    renderComments(updated.comments || [], window.currentPostId, updated.pinnedComment);
+  };
+
+  window.addComment = async () => {
+    const text = document.getElementById('comment-input').value.trim();
+    if (!text) return;
+    const snap = await getDoc(doc(db, 'users', currentUser.uid));
+    const name = snap.exists() ? snap.data().displayName : currentUser.email;
+    const ref = doc(db, 'posts', window.currentPostId);
+    const postData = (await getDoc(ref)).data();
+    await updateDoc(ref, { comments: arrayUnion({ authorId: currentUser.uid, authorName: name, text, createdAt: Date.now(), replies: [] }) });
+    
+    await createNotification(postData.authorId, `${name} commented on your post: "${postData.title}"`, window.currentPostId);
+    await notifyMentionedUsers(text, window.currentPostId, postData.title);
+    
+    document.getElementById('comment-input').value = '';
+    const updated = (await getDoc(ref)).data();
+    renderComments(updated.comments || [], window.currentPostId, updated.pinnedComment);
+    setupMentionAutocomplete('comment-input');
+  };
+
+  window.deleteComment = async (index) => {
+    if (!confirm('Delete this comment?')) return;
+    const ref = doc(db, 'posts', window.currentPostId);
+    const data = (await getDoc(ref)).data();
+    const comments = [...(data.comments || [])];
+    comments.splice(index, 1);
+    
+    // Adjust pinned comment index if needed
+    let newPinnedIndex = data.pinnedComment;
+    if (newPinnedIndex !== null && newPinnedIndex !== undefined) {
+      if (newPinnedIndex === index) newPinnedIndex = null;
+      else if (newPinnedIndex > index) newPinnedIndex--;
+    }
+    
+    await updateDoc(ref, { comments, pinnedComment: newPinnedIndex });
+    renderComments(comments, window.currentPostId, newPinnedIndex);
+  };
+
+  window.addReply = async (commentIndex) => {
+    const text = document.getElementById(`reply-input-${commentIndex}`).value.trim();
+    if (!text) return;
+    const snap = await getDoc(doc(db, 'users', currentUser.uid));
+    const name = snap.exists() ? snap.data().displayName : currentUser.email;
+    const ref = doc(db, 'posts', window.currentPostId);
+    const data = (await getDoc(ref)).data();
+    const comments = [...(data.comments || [])];
+    if (!comments[commentIndex].replies) comments[commentIndex].replies = [];
+    comments[commentIndex].replies.push({ authorId: currentUser.uid, authorName: name, text, createdAt: Date.now() });
+    await updateDoc(ref, { comments });
+    
+    await createNotification(comments[commentIndex].authorId, `${name} replied to your comment on "${data.title}"`, window.currentPostId);
+    await notifyMentionedUsers(text, window.currentPostId, data.title);
+    
+    document.getElementById(`reply-input-${commentIndex}`).value = '';
+    renderComments(comments, window.currentPostId, data.pinnedComment);
+  };
+
+  window.deleteReply = async (commentIndex, replyIndex) => {
+    if (!confirm('Delete this reply?')) return;
+    const ref = doc(db, 'posts', window.currentPostId);
+    const data = (await getDoc(ref)).data();
+    const comments = [...(data.comments || [])];
+    comments[commentIndex].replies.splice(replyIndex, 1);
+    await updateDoc(ref, { comments });
+    renderComments(comments, window.currentPostId, data.pinnedComment);
+  };
+
+  // --- Profile ---
+  window.openProfile = async (uid, name) => {
+    closeModal('modal-bg');
+    
+    document.getElementById('profile-body').innerHTML = '<span class="meta">Loading...</span>';
+    document.getElementById('profile-bg').style.display = 'block';
+
+    const userSnap = await getDoc(doc(db, 'users', uid));
+    const userData = userSnap.exists() ? userSnap.data() : {};
+    const displayName = userData.displayName || name;
+    const bio = userData.bio || '';
+    const profileColor = userData.profileColor || '#6b8e23';
+    const joinedDate = userData.createdAt ? new Date(userData.createdAt.seconds * 1000).toLocaleDateString() : 'Unknown';
+
+    const userPosts = allPosts.filter(p => p.authorId === uid);
+    const postCount = userPosts.length;
+    
+    let commentCount = 0;
+    for (const post of allPosts) {
+      if (post.comments) {
+        for (const comment of post.comments) {
+          if (comment.authorId === uid) commentCount++;
+          if (comment.replies) {
+            for (const reply of comment.replies) {
+              if (reply.authorId === uid) commentCount++;
+            }
+          }
+        }
+      }
+    }
+    
+    let totalScore = 0;
+    for (const post of userPosts) {
+      totalScore += (post.upvotes?.length || 0) - (post.downvotes?.length || 0);
+    }
+    
+    const recent = userPosts.slice(0, 3);
+    const initials = displayName.substring(0, 2).toUpperCase();
+    
+    // Friend status
+    const isSelf = currentUser && currentUser.uid === uid;
+    const isFriend = friends.includes(uid);
+    const hasSentRequest = friendRequests.sent.includes(uid);
+    const hasReceivedRequest = friendRequests.received.includes(uid);
+    
+    let friendButton = '';
+    if (!isSelf) {
+      if (isFriend) {
+        friendButton = `<button onclick="removeFriend('${uid}')" style="background:#cc0000; color:white;">Remove Friend</button>`;
+      } else if (hasSentRequest) {
+        friendButton = `<button disabled>Request Sent</button>`;
+      } else if (hasReceivedRequest) {
+        friendButton = `<button onclick="acceptFriendRequest('${uid}')" style="background:#228b22; color:white;">Accept Request</button> <button onclick="declineFriendRequest('${uid}')">Decline</button>`;
+      } else {
+        friendButton = `<button onclick="sendFriendRequest('${uid}', '${esc(displayName)}')">Add Friend</button>`;
+      }
+    }
+
+    document.getElementById('profile-body').innerHTML = `
+      <div class="profile-header">
+        <div class="profile-avatar" style="background:${profileColor};">${initials}</div>
+        <div>
+          <b style="font-size:18px;">${esc(displayName)}</b>
+          <div class="meta">Joined ${joinedDate}</div>
+        </div>
+      </div>
+      ${friendButton ? `<div style="margin-bottom:12px;">${friendButton}</div>` : ''}
+      ${bio ? `<div class="profile-bio">"${esc(bio)}"</div>` : ''}
+      <div class="profile-stats">
+        <div class="profile-stat">
+          <div class="profile-stat-value">${postCount}</div>
+          <div class="profile-stat-label">Posts</div>
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-value">${commentCount}</div>
+          <div class="profile-stat-label">Comments</div>
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-value">${totalScore}</div>
+          <div class="profile-stat-label">Score</div>
+        </div>
+      </div>
+      <b>Recent Posts</b>
+      <div style="margin-top:6px;">
+        ${recent.length ? recent.map(p => `
+          <div style="margin-bottom:6px;">
+            <span class="post-title" style="cursor:pointer; font-size:13px;" onclick="closeModal('profile-bg'); openPost('${p.id}')">${esc(p.title)}</span>
+            <span class="meta"> &bull; <span class="tag">${esc(p.tag||'general')}</span></span>
+          </div>`).join('') : '<span class="meta">No posts yet.</span>'}
+      </div>
+    `;
+  };
+
+  window.viewOwnProfile = () => {
+    if (currentUser) {
+      openProfile(currentUser.uid, currentUserName);
+    }
+  };
+
+  // --- Helpers ---
+  window.closeModal = (id) => {
+    document.getElementById(id).style.display = 'none';
+    if (id === 'modal-bg') window.currentPostId = null;
+  };
+
+  window.onclick = e => {
+    if (e.target.id === 'modal-bg') closeModal('modal-bg');
+    if (e.target.id === 'profile-bg') closeModal('profile-bg');
+    if (e.target.id === 'name-bg') closeModal('name-bg');
+    if (e.target.id === 'notif-bg') closeModal('notif-bg');
+    if (e.target.id === 'edit-profile-bg') closeModal('edit-profile-bg');
+    
+    // Close mention dropdown when clicking outside
+    const dropdown = document.getElementById('mention-dropdown');
+    if (dropdown && !e.target.closest('textarea') && !e.target.closest('.mention-dropdown')) {
+      dropdown.style.display = 'none';
+    }
+  };
+
+  function showErr(elId, msg) {
+    const el = document.getElementById(elId);
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function linkify(text) {
+    return text.replace(/(https?:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  }
+
+  function esc(t) {
+    if (!t) return '';
+    const d = document.createElement('div');
+    d.textContent = t;
+    return d.innerHTML;
+  }
+</script>
+</body>
+</html>
