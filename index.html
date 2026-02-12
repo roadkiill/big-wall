@@ -85,6 +85,12 @@
     .friend-name { font-weight: bold; color: #333; font-size: 12px; }
     .friend-recent { color: #777; font-size: 10px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     
+    /* ONLINE MARKER */
+    .presence-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; flex-shrink: 0; }
+    .presence-dot.online { background: #22cc44; box-shadow: 0 0 4px #22cc44; }
+    .presence-dot.offline { background: #999; }
+
+
     /* NEWS SIDEBAR */
     #news-sidebar { width: 220px; flex-shrink: 0; }
     .news-box { background: #61561c; border: 2px solid #cc9900; padding: 10px; margin-bottom: 8px; color: #f0e8d0; }
@@ -631,6 +637,7 @@
       if (!quill) initQuill();
       listenToNotifications(user.uid);
       listenToFriends(user.uid);
+      startPresenceTracking(user.uid);
     } else {
       currentUser = null;
       currentUserName = null;
@@ -743,23 +750,57 @@
     });
   }
 
-  async function renderFriendsList() {
-    const el = document.getElementById('friends-list');
-    if (!friends.length) { el.innerHTML = '<span class="meta">No friends yet</span>'; return; }
-    const friendsData = await Promise.all(friends.map(async (fid) => {
-      const userSnap = await getDoc(doc(db, 'users', fid));
-      if (!userSnap.exists()) return null;
-      const userData = userSnap.data();
-      const userPosts = allPosts.filter(p => p.authorId === fid);
-      const recentPost = userPosts.length > 0 ? userPosts[0].title : 'No posts yet';
-      return { id: fid, name: userData.displayName, recentPost };
-    }));
-    el.innerHTML = friendsData.filter(f => f).map(f => `
-      <div class="friend-item" onclick="openProfile('${f.id}', '${esc(f.name)}')">
+  // --- Presence System ---
+function startPresenceTracking(uid) {
+  const userRef = doc(db, 'users', uid);
+  
+  // Write immediately on load
+  updateDoc(userRef, { lastSeen: Date.now() });
+  
+  // Update every 60 seconds while tab is open
+  setInterval(() => {
+    updateDoc(userRef, { lastSeen: Date.now() });
+  }, 60000);
+  
+  // Update on any user activity
+  ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(event => {
+    document.addEventListener(event, () => {
+      updateDoc(userRef, { lastSeen: Date.now() });
+    }, { passive: true, capture: false });
+  });
+}
+
+function isOnline(lastSeen) {
+  if (!lastSeen) return false;
+  // Consider online if active within last 2 minutes
+  return (Date.now() - lastSeen) < 120000;
+}
+
+async function renderFriendsList() {
+  const el = document.getElementById('friends-list');
+  if (!friends.length) { el.innerHTML = '<span class="meta">No friends yet</span>'; return; }
+  const friendsData = await Promise.all(friends.map(async (fid) => {
+    const userSnap = await getDoc(doc(db, 'users', fid));
+    if (!userSnap.exists()) return null;
+    const userData = userSnap.data();
+    const userPosts = allPosts.filter(p => p.authorId === fid);
+    const recentPost = userPosts.length > 0 ? userPosts[0].title : 'No posts yet';
+    const online = isOnline(userData.lastSeen);
+    return { id: fid, name: userData.displayName, recentPost, online };
+  }));
+  
+  // Sort: online friends first
+  const sorted = friendsData.filter(f => f).sort((a, b) => b.online - a.online);
+  
+  el.innerHTML = sorted.map(f => `
+    <div class="friend-item" onclick="openProfile('${f.id}', '${esc(f.name)}')">
+      <div style="display:flex; align-items:center; gap:4px;">
+        <span class="presence-dot ${f.online ? 'online' : 'offline'}"></span>
         <div class="friend-name">${esc(f.name)}</div>
-        <div class="friend-recent">${esc(f.recentPost)}</div>
-      </div>`).join('');
-  }
+      </div>
+      <div class="friend-recent">${esc(f.recentPost)}</div>
+    </div>`).join('');
+}
 
   window.sendFriendRequest = async (targetUid, targetName) => {
     if (friends.includes(targetUid)) { alert('Already friends!'); return; }
