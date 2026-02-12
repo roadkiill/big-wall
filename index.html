@@ -113,7 +113,7 @@
     /* Profile enhancements */
     .profile-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
     .profile-avatar { width: 60px; height: 60px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; color: white; border: 1px solid #999; }
-    .profile-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .profile-stats { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
     .profile-stat { background: #f5f4f0; border: 1px solid #aaa; padding: 8px; text-align: center; }
     .profile-stat-value { font-size: 18px; font-weight: bold; color: #333; }
     .profile-stat-label { font-size: 11px; color: #777; }
@@ -125,6 +125,31 @@
     .mention-item:hover { background: #e0ddd8; }
     .mention-item.selected { background: #d0cdc8; }
     .mention-highlight { background: #fff9e6; color: #cc9900; font-weight: bold; }
+    
+    /* Success notification toast */
+    .success-toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #228b22;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      z-index: 10000;
+      animation: slideIn 0.3s ease-out;
+      font-weight: bold;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(400px); opacity: 0; }
+    }
     
     @media (max-width: 800px) {
       #container { flex-direction: column; }
@@ -184,7 +209,7 @@
       <label>Title</label>
       <input type="text" id="post-title" maxlength="500">
       <div class="meta" style="text-align:right; margin-top:-4px; margin-bottom:6px;"><span id="title-count">0</span>/500</div>
-      <label>Body</label>
+      <label>Body (Rich Text Editor)</label>
       <div id="editor-container"></div>
       <div class="meta" style="text-align:right; margin-top:4px; margin-bottom:6px;">
         <span id="body-count">0</span> characters
@@ -315,6 +340,8 @@
   window.currentPostId = null;
   let friends = [];
   let friendRequests = { sent: [], received: [] };
+  let followers = [];
+  let following = [];
   let quill = null;
 
   // Initialize Quill editor
@@ -338,7 +365,7 @@
       modules: {
         toolbar: toolbarOptions
       },
-      placeholder: 'Write your post content here...'
+      placeholder: 'Write your post content here... (@mention friends)'
     });
 
     // Update character count
@@ -346,6 +373,105 @@
       const text = quill.getText();
       document.getElementById('body-count').textContent = text.length;
     });
+    
+    // Setup @mention for Quill editor
+    setupQuillMentions();
+  }
+  
+  // @mention autocomplete for Quill editor
+  function setupQuillMentions() {
+    const editorContainer = document.querySelector('#editor-container .ql-editor');
+    const dropdown = document.createElement('div');
+    dropdown.className = 'mention-dropdown';
+    dropdown.id = 'quill-mention-dropdown';
+    dropdown.style.position = 'fixed';
+    dropdown.style.display = 'none';
+    document.body.appendChild(dropdown);
+    
+    let selectedIndex = -1;
+    let mentionSearch = null;
+    
+    quill.on('text-change', async function() {
+      const selection = quill.getSelection();
+      if (!selection) return;
+      
+      const text = quill.getText(0, selection.index);
+      const match = text.match(/@(\w*)$/);
+      
+      if (match && friends.length > 0) {
+        const searchTerm = match[1].toLowerCase();
+        const friendsData = await Promise.all(friends.map(async (fid) => {
+          const snap = await getDoc(doc(db, 'users', fid));
+          return snap.exists() ? { id: fid, name: snap.data().displayName } : null;
+        }));
+        
+        const filtered = friendsData.filter(f => f && f.name.toLowerCase().includes(searchTerm));
+        
+        if (filtered.length > 0) {
+          selectedIndex = 0;
+          mentionSearch = { start: selection.index - match[1].length - 1, length: match[0].length };
+          
+          dropdown.innerHTML = filtered.map((f, i) => 
+            `<div class="mention-item ${i === 0 ? 'selected' : ''}" data-name="${esc(f.name)}" data-index="${i}">${esc(f.name)}</div>`
+          ).join('');
+          dropdown.style.display = 'block';
+          
+          const bounds = quill.getBounds(selection.index);
+          const editorRect = editorContainer.getBoundingClientRect();
+          dropdown.style.left = (editorRect.left + bounds.left) + 'px';
+          dropdown.style.bottom = (window.innerHeight - editorRect.top - bounds.top + 5) + 'px';
+          dropdown.style.width = '200px';
+          dropdown.style.top = 'auto';
+          
+          dropdown.querySelectorAll('.mention-item').forEach(item => {
+            item.onclick = () => {
+              insertQuillMention(item.dataset.name);
+            };
+          });
+        } else {
+          dropdown.style.display = 'none';
+        }
+      } else {
+        dropdown.style.display = 'none';
+      }
+    });
+    
+    editorContainer.addEventListener('keydown', (e) => {
+      if (dropdown.style.display === 'none') return;
+      
+      const items = dropdown.querySelectorAll('.mention-item');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+        updateQuillSelection(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedIndex = Math.max(selectedIndex - 1, 0);
+        updateQuillSelection(items);
+      } else if (e.key === 'Enter' && selectedIndex >= 0 && items.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        const selected = items[selectedIndex];
+        insertQuillMention(selected.dataset.name);
+      } else if (e.key === 'Escape') {
+        dropdown.style.display = 'none';
+      }
+    });
+    
+    function updateQuillSelection(items) {
+      items.forEach((item, i) => {
+        item.classList.toggle('selected', i === selectedIndex);
+      });
+    }
+    
+    function insertQuillMention(name) {
+      if (!mentionSearch) return;
+      quill.deleteText(mentionSearch.start, mentionSearch.length);
+      quill.insertText(mentionSearch.start, '@' + name + ' ');
+      quill.setSelection(mentionSearch.start + name.length + 2);
+      dropdown.style.display = 'none';
+      mentionSearch = null;
+    }
   }
 
   // --- Auth ---
@@ -364,7 +490,9 @@
           profileColor: '#6b8e23',
           friends: [],
           friendRequestsSent: [],
-          friendRequestsReceived: []
+          friendRequestsReceived: [],
+          followers: [],
+          following: []
         });
       }
       document.getElementById('user-label').textContent = currentUserName;
@@ -408,7 +536,9 @@
           profileColor: '#6b8e23',
           friends: [],
           friendRequestsSent: [],
-          friendRequestsReceived: []
+          friendRequestsReceived: [],
+          followers: [],
+          following: []
         });
       } else {
         await signInWithEmailAndPassword(auth, email, pass);
@@ -486,6 +616,8 @@
         sent: data.friendRequestsSent || [],
         received: data.friendRequestsReceived || []
       };
+      followers = data.followers || [];
+      following = data.following || [];
       await renderFriendsList();
     });
   }
@@ -540,7 +672,12 @@
     // Send notification
     await createNotification(targetUid, `${currentUserName} sent you a friend request`, null, 'friend_request', currentUser.uid);
     
-    alert('Friend request sent!');
+    showSuccessToast('Friend request sent!');
+    
+    // Auto-refresh profile to update buttons
+    setTimeout(() => {
+      openProfile(targetUid, targetName);
+    }, 100);
   };
 
   window.acceptFriendRequest = async (requesterUid) => {
@@ -587,6 +724,47 @@
     closeModal('profile-bg');
   };
 
+  // --- Follow System ---
+  window.followUser = async (targetUid, targetName) => {
+    if (following.includes(targetUid)) {
+      alert('Already following!');
+      return;
+    }
+    
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      following: arrayUnion(targetUid)
+    });
+    
+    await updateDoc(doc(db, 'users', targetUid), {
+      followers: arrayUnion(currentUser.uid)
+    });
+    
+    await createNotification(targetUid, `${currentUserName} started following you!`, null, 'follow');
+    
+    showSuccessToast(`You're now following ${targetName}!`);
+    
+    // Auto-refresh profile to update buttons
+    setTimeout(() => {
+      openProfile(targetUid, targetName);
+    }, 100);
+  };
+
+  window.unfollowUser = async (targetUid) => {
+    if (!confirm('Unfollow this user?')) return;
+    
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      following: arrayRemove(targetUid)
+    });
+    
+    await updateDoc(doc(db, 'users', targetUid), {
+      followers: arrayRemove(currentUser.uid)
+    });
+    
+    showSuccessToast('Unfollowed successfully!');
+    
+    closeModal('profile-bg');
+  };
+
   // --- Notifications ---
   function listenToNotifications(uid) {
     const q = query(collection(db, 'notifications'), where('recipientId', '==', uid), orderBy('createdAt', 'desc'));
@@ -615,18 +793,23 @@
     }
     
     const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    document.getElementById('notif-body').innerHTML = notifs.map(n => {
+    let html = '<button onclick="clearAllNotifications()" style="margin-bottom:8px;">Clear All</button><hr>';
+    html += notifs.map(n => {
       const timeAgo = n.createdAt ? getTimeAgo(n.createdAt.seconds * 1000) : 'just now';
       let clickAction = n.postId ? `handleNotifClick('${n.id}', '${n.postId}', '')` : 
                         n.type === 'friend_request' ? `handleNotifClick('${n.id}', '', '${n.requesterId}')` : 
                         `markNotifRead('${n.id}')`;
       return `
-        <div class="notif-item ${n.read ? '' : 'unread'}" onclick="${clickAction}">
-          ${esc(n.message)}
-          <span class="notif-time">${timeAgo}</span>
+        <div class="notif-item ${n.read ? '' : 'unread'}" style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="flex:1; cursor:pointer;" onclick="${clickAction}">
+            ${esc(n.message)}
+            <span class="notif-time">${timeAgo}</span>
+          </div>
+          <button class="del-btn" style="margin-left:8px; font-size:14px;" onclick="event.stopPropagation(); dismissNotif('${n.id}')">✕</button>
         </div>
       `;
     }).join('');
+    document.getElementById('notif-body').innerHTML = html;
     
     // Mark all as read
     for (const d of snap.docs) {
@@ -649,6 +832,20 @@
 
   window.markNotifRead = async (notifId) => {
     await updateDoc(doc(db, 'notifications', notifId), { read: true });
+  };
+
+  window.dismissNotif = async (notifId) => {
+    await deleteDoc(doc(db, 'notifications', notifId));
+  };
+
+  window.clearAllNotifications = async () => {
+    if (!confirm('Clear all notifications?')) return;
+    const q = query(collection(db, 'notifications'), where('recipientId', '==', currentUser.uid));
+    const snap = await getDocs(q);
+    for (const d of snap.docs) {
+      await deleteDoc(doc(db, 'notifications', d.id));
+    }
+    document.getElementById('notif-body').innerHTML = '<span class="meta">No notifications yet.</span>';
   };
 
   function getTimeAgo(timestamp) {
@@ -699,7 +896,7 @@
       return;
     }
     
-    await addDoc(collection(db, 'posts'), {
+    const postRef = await addDoc(collection(db, 'posts'), {
       title, 
       content: contentHTML,
       contentPlainText: contentText,
@@ -712,6 +909,19 @@
       comments: [],
       pinnedComment: null
     });
+    
+    // Notify followers about the new post
+    const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      const myFollowers = userData.followers || [];
+      for (const followerId of myFollowers) {
+        await createNotification(followerId, `${currentUserName} posted: "${title}"`, postRef.id, 'new_post');
+      }
+    }
+    
+    // Handle @mentions in the post
+    await notifyMentionedUsers(contentText, postRef.id, title);
     
     document.getElementById('post-title').value = '';
     quill.setContents([]);
@@ -882,7 +1092,12 @@
   // --- @ Mention Autocomplete ---
   function setupMentionAutocomplete(textareaId) {
     const textarea = document.getElementById(textareaId);
-    const dropdown = document.getElementById('mention-dropdown');
+    if (!textarea) return;
+    
+    const dropdownId = textareaId.replace('input', 'dropdown').replace('reply-input', 'mention-dropdown');
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
     let selectedIndex = -1;
     
     textarea.addEventListener('input', async (e) => {
@@ -908,9 +1123,11 @@
           dropdown.style.display = 'block';
           
           const rect = textarea.getBoundingClientRect();
+          dropdown.style.position = 'fixed';
           dropdown.style.left = rect.left + 'px';
-          dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+          dropdown.style.bottom = (window.innerHeight - rect.top + 5) + 'px';
           dropdown.style.width = rect.width + 'px';
+          dropdown.style.top = 'auto';
           
           dropdown.querySelectorAll('.mention-item').forEach(item => {
             item.addEventListener('click', () => {
@@ -940,7 +1157,10 @@
       } else if (e.key === 'Enter' && selectedIndex >= 0) {
         e.preventDefault();
         const selected = items[selectedIndex];
-        insertMention(textarea, selected.dataset.name, textarea.value.substring(0, textarea.selectionStart).match(/@(\w*)$/)[0].length);
+        const currentMatch = textarea.value.substring(0, textarea.selectionStart).match(/@(\w*)$/);
+        if (currentMatch) {
+          insertMention(textarea, selected.dataset.name, currentMatch[0].length);
+        }
       } else if (e.key === 'Escape') {
         dropdown.style.display = 'none';
       }
@@ -1044,7 +1264,7 @@
     const isShowing = box.style.display !== 'none';
     box.style.display = isShowing ? 'none' : 'block';
     if (!isShowing) {
-      setupMentionAutocomplete(`reply-input-${i}`, `mention-dropdown-${i}`);
+      setupMentionAutocomplete(`reply-input-${i}`);
     }
   };
 
@@ -1140,6 +1360,8 @@
     const bio = userData.bio || '';
     const profileColor = userData.profileColor || '#6b8e23';
     const joinedDate = userData.createdAt ? new Date(userData.createdAt.seconds * 1000).toLocaleDateString() : 'Unknown';
+    const followerCount = (userData.followers || []).length;
+    const followingCount = (userData.following || []).length;
 
     const userPosts = allPosts.filter(p => p.authorId === uid);
     const postCount = userPosts.length;
@@ -1171,9 +1393,19 @@
     const isFriend = friends.includes(uid);
     const hasSentRequest = friendRequests.sent.includes(uid);
     const hasReceivedRequest = friendRequests.received.includes(uid);
+    const isFollowing = following.includes(uid);
     
     let friendButton = '';
+    let followButton = '';
     if (!isSelf) {
+      // Follow button
+      if (isFollowing) {
+        followButton = `<button onclick="unfollowUser('${uid}')" style="background:#888; color:white;">Unfollow</button>`;
+      } else {
+        followButton = `<button onclick="followUser('${uid}', '${esc(displayName)}')" style="background:#4682b4; color:white;">Follow</button>`;
+      }
+      
+      // Friend button
       if (isFriend) {
         friendButton = `<button onclick="removeFriend('${uid}')" style="background:#cc0000; color:white;">Remove Friend</button>`;
       } else if (hasSentRequest) {
@@ -1193,7 +1425,7 @@
           <div class="meta">Joined ${joinedDate}</div>
         </div>
       </div>
-      ${friendButton ? `<div style="margin-bottom:12px;">${friendButton}</div>` : ''}
+      ${followButton || friendButton ? `<div style="margin-bottom:12px;">${followButton} ${friendButton}</div>` : ''}
       ${bio ? `<div class="profile-bio">"${esc(bio)}"</div>` : ''}
       <div class="profile-stats">
         <div class="profile-stat">
@@ -1203,6 +1435,10 @@
         <div class="profile-stat">
           <div class="profile-stat-value">${commentCount}</div>
           <div class="profile-stat-label">Comments</div>
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-value">${followerCount}</div>
+          <div class="profile-stat-label">Followers</div>
         </div>
         <div class="profile-stat">
           <div class="profile-stat-value">${totalScore}</div>
@@ -1252,8 +1488,29 @@
     el.style.display = 'block';
   }
 
+  function showSuccessToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'success-toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.style.animation = 'slideOut 0.3s ease-out';
+      setTimeout(() => {
+        document.body.removeChild(toast);
+      }, 300);
+    }, 2000);
+  }
+
+  window.confirmLink = (url) => {
+    if (confirm(`u sure bro?\n\nthis link may be dangerous and cause damage to your device. Are you sure you want to open ${url}?\n\nClick OK for "yeh" or Cancel for "noo"`)) {
+      window.open(url, '_blank', 'noopener');
+    }
+    return false;
+  };
+
   function linkify(text) {
-    return text.replace(/(https?:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    return text.replace(/(https?:\/\/[^\s<>"]+)/g, '<a href="#" onclick="confirmLink(\'$1\'); return false;" style="color:#0066cc; text-decoration:underline;">$1</a>');
   }
 
   function esc(t) {
