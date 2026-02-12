@@ -1139,7 +1139,7 @@
       return `
         <div class="post ${p.pinned ? 'pinned-post' : ''}">
           <div class="post-title" onclick="openPost('${p.id}')">
-            ${p.pinned ? '<span class="post-pin-badge">📌 PINNED</span>' : ''}${esc(p.title)}
+            ${p.pinned ? '<span class="post-pin-badge">PINNED</span>' : ''}${esc(p.title)}
           </div>
           ${preview ? `<div class="meta" style="margin-top:4px;">${esc(preview)}</div>` : ''}
           <div class="meta" style="margin-top:4px;">
@@ -1179,8 +1179,8 @@
 
     const adminPostControls = isAdmin ? `
       ${post.pinned
-        ? `<button class="pin-btn" style="margin-left:8px;" onclick="unpinPost('${id}'); closeModal('modal-bg')">📌 Unpin Post</button>`
-        : `<button class="pin-btn" style="margin-left:8px;" onclick="pinPost('${id}'); closeModal('modal-bg')">📌 Pin Post</button>`
+        ? `<button class="pin-btn" style="margin-left:8px;" onclick="unpinPost('${id}'); closeModal('modal-bg')">Unpin Post</button>`
+        : `<button class="pin-btn" style="margin-left:8px;" onclick="pinPost('${id}'); closeModal('modal-bg')">Pin Post</button>`
       }
       ${!isOwner ? `<button class="del-btn" style="margin-left:12px;" onclick="deletePost('${id}')">delete post</button>` : ''}
     ` : '';
