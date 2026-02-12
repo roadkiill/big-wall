@@ -144,6 +144,24 @@
     .news-modal-content .post-content { background: #3a3a3a; border-color: #555; color: #f0e8d0; }
     .news-modal-content h2 { color: #cc9900; }
 
+    /* DM styles */
+    .dm-message { background: #fff; border: 1px solid #ccc; padding: 6px 8px; margin-bottom: 4px; border-radius: 3px; }
+    .dm-message.sent { background: #e6f2ff; border-color: #4682b4; text-align: right; }
+    .dm-message.received { background: #f5f4f0; border-color: #aaa; }
+    .dm-message-sender { font-weight: bold; font-size: 11px; color: #555; margin-bottom: 2px; }
+    .dm-message-text { font-size: 12px; color: #333; word-wrap: break-word; }
+    .dm-message-time { font-size: 10px; color: #999; margin-top: 2px; }
+    
+    /* Profile action buttons */
+    .profile-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .profile-actions button { flex: 0 0 auto; white-space: nowrap; }
+    
+    /* Banned screen */
+    .banned-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #d4d0c8; }
+    .banned-screen-box { background: #eae8e0; border: 3px solid #cc0000; padding: 30px; max-width: 500px; text-align: center; }
+    .banned-screen-box h1 { color: #cc0000; font-size: 32px; margin: 0 0 20px 0; }
+    .banned-screen-box .banned-reason { background: #ffeeee; border: 1px solid #cc0000; padding: 15px; margin: 15px 0; font-size: 14px; line-height: 1.6; }
+
     @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(400px); opacity: 0; } }
     
@@ -159,6 +177,17 @@
   </style>
 </head>
 <body>
+<!-- Banned screen (shown for banned users) -->
+<div id="banned-screen" class="banned-screen" style="display:none;">
+  <div class="banned-screen-box">
+    <h1>bro ur banned :P</h1>
+    <div class="banned-reason" id="banned-screen-reason"></div>
+    <div class="meta">Contact the admin if you think this is a mistake.</div>
+  </div>
+</div>
+
+<!-- Main site (hidden for banned users) -->
+<div id="main-site">
 <div id="outer-container">
   <!-- NEWS SIDEBAR (left) -->
   <div id="news-sidebar">
@@ -350,7 +379,7 @@
 <div class="modal-bg" id="ban-modal-bg">
   <div class="modal" style="max-width:400px;">
     <div style="text-align:right;"><a href="#" onclick="closeModal('ban-modal-bg'); return false;">[close]</a></div>
-    <b>🚫 Ban User: <span id="ban-target-name"></span></b>
+    <b>Ban User: <span id="ban-target-name"></span></b>
     <hr>
     <div id="ban-error" class="error" style="display:none;"></div>
     <label>Ban Reason (optional)</label>
@@ -375,13 +404,27 @@
   </div>
 </div>
 
+<!-- DM modal -->
+<div class="modal-bg" id="dm-modal-bg">
+  <div class="modal" style="max-width:600px;">
+    <div style="text-align:right;"><a href="#" onclick="closeModal('dm-modal-bg'); return false;">[close]</a></div>
+    <b>Message: <span id="dm-recipient-name"></span></b>
+    <hr>
+    <div id="dm-messages" style="background:#f5f4f0; border:1px solid #aaa; padding:10px; max-height:400px; overflow-y:auto; margin-bottom:8px;"></div>
+    <div style="display:flex; gap:6px;">
+      <input type="text" id="dm-input" placeholder="Type your message..." maxlength="1000" style="flex:1; margin-bottom:0;" onkeypress="if(event.key==='Enter') sendDM()">
+      <button onclick="sendDM()">Send</button>
+    </div>
+  </div>
+</div>
+
 <!-- Quill.js -->
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut as fbSignOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-  import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove, serverTimestamp, getDoc, getDocs, setDoc, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+  import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove, serverTimestamp, getDoc, getDocs, setDoc, where, or, and, limit } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
   const app = initializeApp({
     apiKey: "AIzaSyDe7NHq3dS3UWI2ldlBzyG8Sz05RtbXKN4",
@@ -411,16 +454,21 @@
   let following = [];
   let quill = null;
   let isAdmin = false;
-  let isMod = false;   // set to true if user has isMod:true in their user doc (granted by admin only)
-  let currentPostType = 'regular'; // 'regular' or 'news'
+  let isMod = false;
+  let currentPostType = 'regular';
   let allNewsPosts = [];
   let banTargetUid = null;
   let banTargetNameStr = null;
+  let currentDMRecipient = null;
+  let dmUnsubscribe = null;
+  let blockedUsers = [];
 
   // --- Role checks ---
   function checkAdmin(user) { return user && user.email === ADMIN_EMAIL; }
-  // Mod powers: delete any post, ban users. Cannot: mod/unmod others, post news, pin posts.
   function hasModPower() { return isAdmin || isMod; }
+  
+  // Check if user is blocked
+  function isBlocked(uid) { return blockedUsers.includes(uid); }
 
   // Initialize Quill editor
   function initQuill() {
@@ -454,7 +502,6 @@
     currentPostType = type;
     document.getElementById('btn-regular-post').className = 'post-type-btn' + (type === 'regular' ? ' active-regular' : '');
     document.getElementById('btn-news-post').className = 'post-type-btn' + (type === 'news' ? ' active-news' : '');
-    // Hide tag for news posts
     document.getElementById('tag-wrap').style.display = type === 'news' ? 'none' : 'block';
   };
 
@@ -525,28 +572,30 @@
       if (isAdmin) window._adminUid = user.uid;
       const snap = await getDoc(doc(db, 'users', user.uid));
       
-      // Check if banned
       if (snap.exists()) {
         const userData = snap.data();
-        isMod = !isAdmin && !!userData.isMod; // admin can't also be "mod", they're above that
+        isMod = !isAdmin && !!userData.isMod;
+        blockedUsers = userData.blockedUsers || [];
+        
         const banUntil = userData.bannedUntil;
         const isBanned = banUntil && (banUntil === 'forever' || banUntil > Date.now());
+        
         if (isBanned && !isAdmin && !isMod) {
-          currentUserName = userData.displayName || user.email;
-          document.getElementById('user-label').textContent = currentUserName;
-          document.getElementById('auth-bar').style.display = 'block';
-          document.getElementById('login-box').style.display = 'none';
-          document.getElementById('post-box').style.display = 'none';
-          document.getElementById('sidebar').style.display = 'none';
-          const until = banUntil === 'forever' ? 'You are permanently banned.' : `Banned until ${new Date(banUntil).toLocaleString()}.`;
-          document.getElementById('banned-until-msg').textContent = until;
-          document.getElementById('banned-notice').style.display = 'block';
-          listenToNotifications(user.uid);
+          // Show banned screen
+          const until = banUntil === 'forever' 
+            ? 'You were banned <b>permanently</b>.' 
+            : `You were banned until <b>${new Date(banUntil).toLocaleString()}</b>.`;
+          const reason = userData.banReason ? `<br><br>Reason: <b>${userData.banReason}</b>` : '';
+          document.getElementById('banned-screen-reason').innerHTML = until + reason;
+          document.getElementById('banned-screen').style.display = 'flex';
+          document.getElementById('main-site').style.display = 'none';
           return;
         }
+        
         currentUserName = userData.displayName;
       } else {
         isMod = false;
+        blockedUsers = [];
         currentUserName = user.email;
         await setDoc(doc(db, 'users', user.uid), {
           displayName: user.email,
@@ -559,10 +608,13 @@
           followers: [],
           following: [],
           bannedUntil: null,
-          isMod: false
+          isMod: false,
+          blockedUsers: []
         });
       }
       
+      document.getElementById('banned-screen').style.display = 'none';
+      document.getElementById('main-site').style.display = 'block';
       document.getElementById('user-label').textContent = currentUserName;
       if (isAdmin) document.getElementById('admin-badge-main').style.display = 'inline-block';
       if (isMod) document.getElementById('mod-badge-main').style.display = 'inline-block';
@@ -572,7 +624,6 @@
       document.getElementById('sidebar').style.display = 'block';
       document.getElementById('banned-notice').style.display = 'none';
       
-      // Show post type toggle ONLY for admin (not mods)
       if (isAdmin) {
         document.getElementById('post-type-toggle-wrap').style.display = 'block';
       }
@@ -585,6 +636,9 @@
       currentUserName = null;
       isAdmin = false;
       isMod = false;
+      blockedUsers = [];
+      document.getElementById('banned-screen').style.display = 'none';
+      document.getElementById('main-site').style.display = 'block';
       document.getElementById('auth-bar').style.display = 'none';
       document.getElementById('login-box').style.display = 'block';
       document.getElementById('post-box').style.display = 'none';
@@ -754,6 +808,103 @@
     showSuccessToast('Unfollowed successfully!');
     closeModal('profile-bg');
   };
+  
+  // --- Block System ---
+  window.blockUser = async (targetUid, targetName) => {
+    if (!confirm(`Block ${targetName}? You won't see their posts, comments, or messages.`)) return;
+    await updateDoc(doc(db, 'users', currentUser.uid), { blockedUsers: arrayUnion(targetUid) });
+    blockedUsers.push(targetUid);
+    showSuccessToast(`${targetName} has been blocked.`);
+    closeModal('profile-bg');
+  };
+  
+  window.unblockUser = async (targetUid, targetName) => {
+    if (!confirm(`Unblock ${targetName}?`)) return;
+    await updateDoc(doc(db, 'users', currentUser.uid), { blockedUsers: arrayRemove(targetUid) });
+    blockedUsers = blockedUsers.filter(uid => uid !== targetUid);
+    showSuccessToast(`${targetName} has been unblocked.`);
+    closeModal('profile-bg');
+  };
+
+  // --- DM SYSTEM ---
+  window.openDM = async (recipientUid, recipientName) => {
+    currentDMRecipient = { uid: recipientUid, name: recipientName };
+    document.getElementById('dm-recipient-name').textContent = recipientName;
+    document.getElementById('dm-messages').innerHTML = '<span class="meta">Loading messages...</span>';
+    document.getElementById('dm-input').value = '';
+    document.getElementById('dm-modal-bg').style.display = 'block';
+    
+    if (dmUnsubscribe) dmUnsubscribe();
+    
+    const conversationId = [currentUser.uid, recipientUid].sort().join('_');
+    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    const q = query(messagesRef, orderBy('timestamp', 'asc'));
+    
+    dmUnsubscribe = onSnapshot(q, (snapshot) => {
+      const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderDMMessages(messages);
+    });
+  };
+
+  function renderDMMessages(messages) {
+    const container = document.getElementById('dm-messages');
+    
+    // Filter out messages from blocked users
+    const filteredMessages = messages.filter(msg => !isBlocked(msg.senderId));
+    
+    if (!filteredMessages.length) {
+      container.innerHTML = '<span class="meta">No messages yet. Start the conversation!</span>';
+      return;
+    }
+    
+    container.innerHTML = filteredMessages.map(msg => {
+      const isSent = msg.senderId === currentUser.uid;
+      const time = msg.timestamp ? new Date(msg.timestamp.seconds * 1000).toLocaleString() : 'just now';
+      return `
+        <div class="dm-message ${isSent ? 'sent' : 'received'}">
+          <div class="dm-message-sender">${esc(msg.senderName)}</div>
+          <div class="dm-message-text">${esc(msg.text)}</div>
+          <div class="dm-message-time">${time}</div>
+        </div>
+      `;
+    }).join('');
+    
+    container.scrollTop = container.scrollHeight;
+  }
+
+  window.sendDM = async () => {
+    const text = document.getElementById('dm-input').value.trim();
+    if (!text || !currentDMRecipient) return;
+    
+    const conversationId = [currentUser.uid, currentDMRecipient.uid].sort().join('_');
+    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    
+    await addDoc(messagesRef, {
+      senderId: currentUser.uid,
+      senderName: currentUserName,
+      recipientId: currentDMRecipient.uid,
+      text: text,
+      timestamp: serverTimestamp()
+    });
+    
+    const convRef = doc(db, 'conversations', conversationId);
+    await setDoc(convRef, {
+      participants: [currentUser.uid, currentDMRecipient.uid],
+      lastMessage: text,
+      lastMessageTime: serverTimestamp(),
+      lastMessageSender: currentUser.uid
+    }, { merge: true });
+    
+    await createNotification(
+      currentDMRecipient.uid,
+      `${currentUserName} sent you a message: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
+      null,
+      'dm',
+      currentUser.uid
+    );
+    
+    document.getElementById('dm-input').value = '';
+  };
 
   // --- Notifications ---
   function listenToNotifications(uid) {
@@ -778,6 +929,7 @@
       const timeAgo = n.createdAt ? getTimeAgo(n.createdAt.seconds * 1000) : 'just now';
       let clickAction = n.postId ? `handleNotifClick('${n.id}', '${n.postId}', '')` :
                         n.type === 'friend_request' ? `handleNotifClick('${n.id}', '', '${n.requesterId}')` :
+                        n.type === 'dm' && n.requesterId ? `handleNotifClick('${n.id}', '', '${n.requesterId}', 'dm')` :
                         `markNotifRead('${n.id}')`;
       return `<div class="notif-item ${n.read ? '' : 'unread'}" style="display:flex; justify-content:space-between; align-items:center;">
         <div style="flex:1; cursor:pointer;" onclick="${clickAction}">${esc(n.message)}<span class="notif-time">${timeAgo}</span></div>
@@ -788,17 +940,22 @@
     for (const d of snap.docs) { if (!d.data().read) await updateDoc(doc(db, 'notifications', d.id), { read: true }); }
   };
 
-  window.handleNotifClick = async (notifId, postId, requesterId) => {
+  window.handleNotifClick = async (notifId, postId, requesterId, type) => {
     closeModal('notif-bg');
     if (postId) {
-      // Check if it's a news post or regular post
       const newsSnap = await getDoc(doc(db, 'newsPosts', postId));
       if (newsSnap.exists()) openNewsPost(postId);
       else openPost(postId);
     } else if (requesterId) {
-      const userSnap = await getDoc(doc(db, 'users', requesterId));
-      const name = userSnap.exists() ? userSnap.data().displayName : 'User';
-      openProfile(requesterId, name);
+      if (type === 'dm') {
+        const userSnap = await getDoc(doc(db, 'users', requesterId));
+        const name = userSnap.exists() ? userSnap.data().displayName : 'User';
+        openDM(requesterId, name);
+      } else {
+        const userSnap = await getDoc(doc(db, 'users', requesterId));
+        const name = userSnap.exists() ? userSnap.data().displayName : 'User';
+        openProfile(requesterId, name);
+      }
     }
   };
 
@@ -841,7 +998,6 @@
     document.getElementById('ban-duration-val').value = '1';
     document.getElementById('ban-duration-unit').value = 'days';
     document.getElementById('ban-modal-bg').style.display = 'block';
-    // Radio toggle
     document.querySelectorAll('input[name="ban-type"]').forEach(r => {
       r.addEventListener('change', () => {
         document.getElementById('ban-duration-row').style.display = r.value === 'timed' ? 'flex' : 'none';
@@ -880,12 +1036,12 @@
     closeModal('profile-bg');
   };
 
-  // --- MOD SYSTEM (admin only can grant/revoke) ---
+  // --- MOD SYSTEM ---
   window.makeMod = async (uid, name) => {
     if (!isAdmin) return;
     if (!confirm(`Make ${name} a moderator?`)) return;
     await updateDoc(doc(db, 'users', uid), { isMod: true });
-    showSuccessToast(`${name} is now a MOD! 🛡️`);
+    showSuccessToast(`${name} is now a MOD!`);
     closeModal('profile-bg');
   };
 
@@ -898,7 +1054,6 @@
   };
 
   // --- NEWS POSTS ---
-  // Listen to news posts
   const newsQuery = query(collection(db, 'newsPosts'), orderBy('createdAt', 'desc'));
   onSnapshot(newsQuery, (snap) => {
     allNewsPosts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -994,7 +1149,6 @@
     if (!contentText || contentText.length < 2) { alert('Post body required.'); return; }
 
     if (currentPostType === 'news') {
-      // Only admin can post news
       if (!isAdmin) { alert('Only the admin can post news!'); return; }
       await addDoc(collection(db, 'newsPosts'), {
         title,
@@ -1035,7 +1189,6 @@
     document.getElementById('title-count').textContent = document.getElementById('post-title').value.length;
   });
 
-  // --- Admin: Pin Post ---
   window.pinPost = async (id) => {
     if (!isAdmin) return;
     await updateDoc(doc(db, 'posts', id), { pinned: true });
@@ -1073,7 +1226,6 @@
     if (window.currentPostId === id) openPost(id);
   };
 
-  // Admin can delete ANY post
   window.deletePost = async (id) => {
     if (!currentUser) return;
     if (!confirm('Delete this post?')) return;
@@ -1105,7 +1257,6 @@
     } else if (sortMode === 'comments') {
       posts.sort((a, b) => (b.comments?.length||0) - (a.comments?.length||0));
     }
-    // Pinned posts always float to top (maintaining sort within pinned group)
     const pinned = posts.filter(p => p.pinned);
     const unpinned = posts.filter(p => !p.pinned);
     filteredPosts = [...pinned, ...unpinned];
@@ -1116,7 +1267,7 @@
   function renderPosts() {
     const start = currentPage * PAGE_SIZE;
     const end = start + PAGE_SIZE;
-    const page = filteredPosts.slice(start, end);
+    const page = filteredPosts.slice(start, end).filter(p => !isBlocked(p.authorId));
     if (!page.length) {
       document.getElementById('posts-area').innerHTML = '<span class="meta">No posts found.</span>';
       document.getElementById('pagination').innerHTML = '';
@@ -1302,14 +1453,21 @@
     if (!el) return;
     const postSnap = allPosts.find(p => p.id === postId);
     const isOwner = currentUser && postSnap && currentUser.uid === postSnap.authorId;
-    if (!comments.length) { el.innerHTML = '<span class="meta">No comments yet.</span>'; return; }
-    let orderedComments = [...comments.map((c, i) => ({ ...c, originalIndex: i }))];
+    
+    // Filter out blocked users
+    const filteredComments = comments.filter(c => !isBlocked(c.authorId));
+    
+    if (!filteredComments.length) { el.innerHTML = '<span class="meta">No comments yet.</span>'; return; }
+    let orderedComments = [...filteredComments.map((c, i) => ({ ...c, originalIndex: i }))];
     let pinnedComment = null;
     if (pinnedCommentIndex !== null && pinnedCommentIndex !== undefined) {
       pinnedComment = orderedComments.find(c => c.originalIndex === pinnedCommentIndex);
       orderedComments = orderedComments.filter(c => c.originalIndex !== pinnedCommentIndex);
     }
-    const renderComment = (c, isPinned = false) => `
+    const renderComment = (c, isPinned = false) => {
+      // Filter replies from blocked users
+      const filteredReplies = (c.replies || []).filter(r => !isBlocked(r.authorId));
+      return `
       <div class="comment ${isPinned ? 'pinned' : ''}">
         <span class="author-link" onclick="openProfile('${esc(c.authorId)}','${esc(c.authorName)}')">${esc(c.authorName)}</span>
         ${isPinned ? '<span class="pin-badge">PINNED</span>' : ''}
@@ -1326,7 +1484,7 @@
           <button onclick="addReply(${c.originalIndex})">Reply</button>
         </div>` : ''}
         <div id="replies-${c.originalIndex}">
-          ${(c.replies||[]).map((r, ri) => `
+          ${filteredReplies.map((r, ri) => `
             <div class="reply">
               <span class="author-link" onclick="openProfile('${esc(r.authorId)}','${esc(r.authorName)}')">${esc(r.authorName)}</span>
               <span class="meta"> &bull; ${new Date(r.createdAt).toLocaleString()}</span>
@@ -1336,6 +1494,7 @@
             </div>`).join('')}
         </div>
       </div>`;
+    };
     let html = '';
     if (pinnedComment) html += renderComment(pinnedComment, true);
     html += orderedComments.map(c => renderComment(c)).join('');
@@ -1454,52 +1613,71 @@
     const hasSentRequest = friendRequests.sent.includes(uid);
     const hasReceivedRequest = friendRequests.received.includes(uid);
     const isFollowing = following.includes(uid);
+    const isUserBlocked = isBlocked(uid);
     
-    // Target user's role info
     const targetIsMod = !!userData.isMod;
-    // Check if the target profile is the admin (by stored email or known UID)
     const targetIsAdmin = (uid === window._adminUid) || (userData.email === ADMIN_EMAIL);
     
-    // Ban status
     const banUntil = userData.bannedUntil;
     const isBanned = banUntil && (banUntil === 'forever' || banUntil > Date.now());
     let banInfo = '';
     if (isBanned) {
       const until = banUntil === 'forever' ? 'Permanently banned' : `Banned until ${new Date(banUntil).toLocaleString()}`;
-      banInfo = `<div style="background:#ffeeee; border:1px solid #cc0000; padding:6px; margin-bottom:8px; font-size:12px; color:#aa0000;">🚫 ${until}${userData.banReason ? ` — "${userData.banReason}"` : ''}</div>`;
+      banInfo = `<div style="background:#ffeeee; border:1px solid #cc0000; padding:6px; margin-bottom:8px; font-size:12px; color:#aa0000;">${until}${userData.banReason ? ` — "${userData.banReason}"` : ''}</div>`;
     }
 
-    let friendButton = '', followButton = '', adminButtons = '';
+    let actionButtons = [];
+    
     if (!isSelf && currentUser) {
-      followButton = isFollowing
-        ? `<button onclick="unfollowUser('${uid}')" style="background:#888; color:white;">Unfollow</button>`
-        : `<button onclick="followUser('${uid}', '${esc(displayName)}')" style="background:#4682b4; color:white;">Follow</button>`;
-      if (isFriend) friendButton = `<button onclick="removeFriend('${uid}')" style="background:#cc0000; color:white;">Remove Friend</button>`;
-      else if (hasSentRequest) friendButton = `<button disabled>Request Sent</button>`;
-      else if (hasReceivedRequest) friendButton = `<button onclick="acceptFriendRequest('${uid}')" style="background:#228b22; color:white;">Accept Request</button> <button onclick="declineFriendRequest('${uid}')">Decline</button>`;
-      else friendButton = `<button onclick="sendFriendRequest('${uid}', '${esc(displayName)}')">Add Friend</button>`;
+      // Message button
+      actionButtons.push(`<button onclick="openDM('${uid}', '${esc(displayName)}')" style="background:#4682b4; color:white;">Message</button>`);
       
+      // Follow/Unfollow button
+      if (isFollowing) {
+        actionButtons.push(`<button onclick="unfollowUser('${uid}')" style="background:#888; color:white;">Unfollow</button>`);
+      } else {
+        actionButtons.push(`<button onclick="followUser('${uid}', '${esc(displayName)}')" style="background:#4682b4; color:white;">Follow</button>`);
+      }
+      
+      // Friend buttons
+      if (isFriend) {
+        actionButtons.push(`<button onclick="removeFriend('${uid}')" style="background:#cc0000; color:white;">Remove Friend</button>`);
+      } else if (hasSentRequest) {
+        actionButtons.push(`<button disabled>Request Sent</button>`);
+      } else if (hasReceivedRequest) {
+        actionButtons.push(`<button onclick="acceptFriendRequest('${uid}')" style="background:#228b22; color:white;">Accept Request</button>`);
+        actionButtons.push(`<button onclick="declineFriendRequest('${uid}')">Decline</button>`);
+      } else {
+        actionButtons.push(`<button onclick="sendFriendRequest('${uid}', '${esc(displayName)}')">Add Friend</button>`);
+      }
+      
+      // Block/Unblock button
+      if (isUserBlocked) {
+        actionButtons.push(`<button onclick="unblockUser('${uid}', '${esc(displayName)}')" style="background:#666; color:white;">Unblock</button>`);
+      } else {
+        actionButtons.push(`<button onclick="blockUser('${uid}', '${esc(displayName)}')" style="background:#555; color:white;">Block</button>`);
+      }
+      
+      // Admin/Mod controls
       if (isAdmin) {
         if (isBanned) {
-          adminButtons = `<button onclick="unbanUser('${uid}', '${esc(displayName)}')" style="background:#228b22; color:white; margin-left:6px;">Unban User</button>`;
+          actionButtons.push(`<button onclick="unbanUser('${uid}', '${esc(displayName)}')" style="background:#228b22; color:white;">Unban User</button>`);
         } else {
-          adminButtons = `<button onclick="openBanModal('${uid}', '${esc(displayName)}')" style="background:#8b0000; color:white; margin-left:6px;">🚫 Ban User</button>`;
+          actionButtons.push(`<button onclick="openBanModal('${uid}', '${esc(displayName)}')" style="background:#8b0000; color:white;">Ban User</button>`);
         }
-        // Admin-only: mod/unmod controls (can't mod another admin)
         if (!targetIsAdmin) {
           if (targetIsMod) {
-            adminButtons += ` <button onclick="removeMod('${uid}', '${esc(displayName)}')" style="background:#555; color:white; margin-left:6px;">Remove Mod</button>`;
+            actionButtons.push(`<button onclick="removeMod('${uid}', '${esc(displayName)}')" style="background:#555; color:white;">Remove Mod</button>`);
           } else {
-            adminButtons += ` <button onclick="makeMod('${uid}', '${esc(displayName)}')" style="background:#1a6b1a; color:white; margin-left:6px;">🛡️ Make Mod</button>`;
+            actionButtons.push(`<button onclick="makeMod('${uid}', '${esc(displayName)}')" style="background:#1a6b1a; color:white;">Make Mod</button>`);
           }
         }
       } else if (isMod) {
-        // Mods can ban/unban but NOT mod/unmod others, and can't touch other mods or admin
         if (!targetIsAdmin && !targetIsMod) {
           if (isBanned) {
-            adminButtons = `<button onclick="unbanUser('${uid}', '${esc(displayName)}')" style="background:#228b22; color:white; margin-left:6px;">Unban User</button>`;
+            actionButtons.push(`<button onclick="unbanUser('${uid}', '${esc(displayName)}')" style="background:#228b22; color:white;">Unban User</button>`);
           } else {
-            adminButtons = `<button onclick="openBanModal('${uid}', '${esc(displayName)}')" style="background:#8b0000; color:white; margin-left:6px;">🚫 Ban User</button>`;
+            actionButtons.push(`<button onclick="openBanModal('${uid}', '${esc(displayName)}')" style="background:#8b0000; color:white;">Ban User</button>`);
           }
         }
       }
@@ -1516,7 +1694,7 @@
         </div>
       </div>
       ${banInfo}
-      ${followButton || friendButton || adminButtons ? `<div style="margin-bottom:12px;">${followButton} ${friendButton} ${adminButtons}</div>` : ''}
+      ${actionButtons.length ? `<div class="profile-actions">${actionButtons.join('')}</div>` : ''}
       ${bio ? `<div class="profile-bio">"${esc(bio)}"</div>` : ''}
       <div class="profile-stats">
         <div class="profile-stat"><div class="profile-stat-value">${postCount}</div><div class="profile-stat-label">Posts</div></div>
@@ -1536,7 +1714,6 @@
   };
 
   const ADMIN_UID_REF = { uid: null };
-  // Store admin email reference for profile display
   window.ADMIN_EMAIL_CONST = ADMIN_EMAIL;
 
   window.viewOwnProfile = () => { if (currentUser) openProfile(currentUser.uid, currentUserName); };
@@ -1545,6 +1722,10 @@
   window.closeModal = (id) => {
     document.getElementById(id).style.display = 'none';
     if (id === 'modal-bg') window.currentPostId = null;
+    if (id === 'dm-modal-bg') {
+      if (dmUnsubscribe) dmUnsubscribe();
+      currentDMRecipient = null;
+    }
   };
 
   window.onclick = e => {
@@ -1555,6 +1736,7 @@
     if (e.target.id === 'edit-profile-bg') closeModal('edit-profile-bg');
     if (e.target.id === 'ban-modal-bg') closeModal('ban-modal-bg');
     if (e.target.id === 'news-modal-bg') closeModal('news-modal-bg');
+    if (e.target.id === 'dm-modal-bg') closeModal('dm-modal-bg');
     const dropdown = document.getElementById('mention-dropdown');
     if (dropdown && !e.target.closest('textarea') && !e.target.closest('.mention-dropdown')) dropdown.style.display = 'none';
   };
@@ -1594,5 +1776,6 @@
     return d.innerHTML;
   }
 </script>
+</div>
 </body>
 </html>
