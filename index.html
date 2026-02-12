@@ -3,14 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Big Wall</title>
+  <title>Floydian</title>
   
   <!-- Quill.js CSS -->
   <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
   
   <style>
     body { font-family: Arial, sans-serif; background: #d4d0c8; margin: 0; padding: 10px; font-size: 13px; }
-    #container { max-width: 1200px; margin: 0 auto; display: flex; gap: 10px; }
+    #outer-container { max-width: 1400px; margin: 0 auto; display: flex; gap: 10px; }
+    #news-sidebar { width: 220px; flex-shrink: 0; }
+    #container { flex: 1; display: flex; gap: 10px; min-width: 0; }
     #sidebar { width: 200px; flex-shrink: 0; }
     #wrap { flex: 1; min-width: 0; }
     h1 { font-size: 28px; margin: 0 0 4px 0; color: #222; }
@@ -22,6 +24,8 @@
     button:hover { background: #ccc; }
     .box { background: #eae8e0; border: 1px solid #999; padding: 10px; margin-bottom: 8px; }
     .post { background: #f5f4f0; border: 1px solid #aaa; padding: 8px 10px; margin-bottom: 6px; }
+    .post.pinned-post { border: 2px solid #cc9900; background: #fffbee; }
+    .post-pin-badge { background: #cc9900; color: white; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 3px; margin-right: 6px; }
     .post-title { font-size: 15px; font-weight: bold; color: #333; cursor: pointer; }
     .post-title:hover { text-decoration: underline; }
     .meta { color: #777; font-size: 11px; }
@@ -41,6 +45,8 @@
     .edit-btn:hover { text-decoration: underline; background: none; }
     .pin-btn { color: #cc9900; background: none; border: none; cursor: pointer; font-size: 11px; padding: 0; margin-left: 8px; }
     .pin-btn:hover { text-decoration: underline; background: none; }
+    .admin-btn { color: #8b0000; background: none; border: none; cursor: pointer; font-size: 11px; padding: 0; margin-left: 8px; }
+    .admin-btn:hover { text-decoration: underline; background: none; }
     .pagination { margin-top: 8px; }
     .pagination button { padding: 3px 10px; margin-right: 4px; }
     .search-row { display: flex; gap: 6px; margin-bottom: 8px; }
@@ -48,49 +54,26 @@
     .search-row select { width: auto; margin-bottom: 0; }
     .search-row button { white-space: nowrap; }
     
+    /* Admin / Mod badges */
+    .admin-badge { background: #8b0000; color: white; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 3px; margin-left: 6px; }
+    .mod-badge { background: #1a6b1a; color: white; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 3px; margin-left: 6px; }
+    .banned-notice { background: #ffeeee; border: 2px solid #cc0000; padding: 12px; text-align: center; font-weight: bold; color: #aa0000; margin-bottom: 8px; }
+    
     /* Rich text editor styles */
-    #editor-container { 
-      background: white; 
-      border: 1px solid #999; 
-      margin-bottom: 6px;
-      min-height: 200px;
-    }
+    #editor-container { background: white; border: 1px solid #999; margin-bottom: 6px; min-height: 200px; }
     .ql-editor { min-height: 200px; }
     .ql-toolbar { background: #f5f4f0; border-bottom: 1px solid #999 !important; }
     
     /* Post content rendering */
-    .post-content {
-      background: white;
-      padding: 12px;
-      border: 1px solid #ccc;
-      margin: 10px 0;
-      line-height: 1.6;
-    }
+    .post-content { background: white; padding: 12px; border: 1px solid #ccc; margin: 10px 0; line-height: 1.6; }
     .post-content h1 { font-size: 24px; margin: 16px 0 8px; }
     .post-content h2 { font-size: 20px; margin: 14px 0 7px; }
     .post-content h3 { font-size: 16px; margin: 12px 0 6px; }
     .post-content ul, .post-content ol { margin: 8px 0; padding-left: 30px; }
     .post-content li { margin: 4px 0; }
-    .post-content blockquote { 
-      border-left: 4px solid #ccc; 
-      padding-left: 12px; 
-      margin: 12px 0;
-      color: #666;
-      font-style: italic;
-    }
-    .post-content pre { 
-      background: #f5f5f5; 
-      padding: 12px; 
-      border: 1px solid #ddd;
-      overflow-x: auto;
-      border-radius: 3px;
-    }
-    .post-content code {
-      background: #f5f5f5;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-family: 'Courier New', monospace;
-    }
+    .post-content blockquote { border-left: 4px solid #ccc; padding-left: 12px; margin: 12px 0; color: #666; font-style: italic; }
+    .post-content pre { background: #f5f5f5; padding: 12px; border: 1px solid #ddd; overflow-x: auto; border-radius: 3px; }
+    .post-content code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
     .post-content img { max-width: 100%; height: auto; margin: 10px 0; }
     .post-content a { color: #0066cc; text-decoration: underline; }
     .post-content a:hover { color: #0052a3; }
@@ -101,6 +84,21 @@
     .friend-item:hover { background: #ececea; }
     .friend-name { font-weight: bold; color: #333; font-size: 12px; }
     .friend-recent { color: #777; font-size: 10px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    /* NEWS SIDEBAR */
+    #news-sidebar { width: 220px; flex-shrink: 0; }
+    .news-box { background: #61561c; border: 2px solid #cc9900; padding: 10px; margin-bottom: 8px; color: #f0e8d0; }
+    .news-box b { color: #ffae00; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+    .news-scroll { max-height: 600px; overflow-y: auto; margin-top: 8px; }
+    .news-scroll::-webkit-scrollbar { width: 6px; }
+    .news-scroll::-webkit-scrollbar-track { background: #1a1a1a; }
+    .news-scroll::-webkit-scrollbar-thumb { background: #cc9900; border-radius: 3px; }
+    .news-item { background: #3a3a3a; border: 1px solid #555; padding: 8px; margin-bottom: 6px; cursor: pointer; border-left: 3px solid #cc9900; }
+    .news-item:hover { background: #444; }
+    .news-item-title { font-size: 12px; font-weight: bold; color: #f0e8d0; line-height: 1.4; }
+    .news-item-meta { color: #999; font-size: 10px; margin-top: 3px; }
+    .news-item-preview { color: #bbb; font-size: 11px; margin-top: 3px; line-height: 1.3; }
+    .news-badge { background: #cc9900; color: #1a1a1a; font-size: 9px; font-weight: bold; padding: 1px 5px; border-radius: 2px; text-transform: uppercase; display: inline-block; margin-bottom: 4px; }
     
     /* Notification styles */
     .notif-btn { position: relative; padding: 4px 12px; }
@@ -127,30 +125,33 @@
     .mention-highlight { background: #fff9e6; color: #cc9900; font-weight: bold; }
     
     /* Success notification toast */
-    .success-toast {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #228b22;
-      color: white;
-      padding: 12px 20px;
-      border-radius: 4px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      z-index: 10000;
-      animation: slideIn 0.3s ease-out;
-      font-weight: bold;
-    }
+    .success-toast { position: fixed; top: 20px; right: 20px; background: #228b22; color: white; padding: 12px 20px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 10000; animation: slideIn 0.3s ease-out; font-weight: bold; }
     
-    @keyframes slideIn {
-      from { transform: translateX(400px); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
+    /* Post type toggle */
+    .post-type-toggle { display: flex; gap: 0; margin-bottom: 8px; }
+    .post-type-btn { flex: 1; padding: 6px; border: 1px solid #999; background: #e0ddd8; cursor: pointer; text-align: center; font-weight: bold; font-size: 12px; }
+    .post-type-btn.active-regular { background: #4682b4; color: white; border-color: #4682b4; }
+    .post-type-btn.active-news { background: #cc9900; color: white; border-color: #cc9900; }
+    .post-type-btn:not(.active-regular):not(.active-news):hover { background: #ccc; }
     
-    @keyframes slideOut {
-      from { transform: translateX(0); opacity: 1; }
-      to { transform: translateX(400px); opacity: 0; }
-    }
+    /* Ban modal */
+    #ban-modal-bg .modal { max-width: 400px; }
+    .ban-duration-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .ban-duration-row input[type=number] { width: 80px; }
     
+    /* News modal */
+    .news-modal-content { background: #2a2a2a; color: #f0e8d0; padding: 16px; border: 1px solid #cc9900; }
+    .news-modal-content .post-content { background: #3a3a3a; border-color: #555; color: #f0e8d0; }
+    .news-modal-content h2 { color: #cc9900; }
+
+    @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(400px); opacity: 0; } }
+    
+    @media (max-width: 1000px) {
+      #outer-container { flex-direction: column; }
+      #news-sidebar { width: 100%; }
+      .news-scroll { max-height: 300px; }
+    }
     @media (max-width: 800px) {
       #container { flex-direction: column; }
       #sidebar { width: 100%; order: 2; }
@@ -158,91 +159,117 @@
   </style>
 </head>
 <body>
-<div id="container">
-  <!-- Friends Sidebar -->
-  <div id="sidebar" style="display:none;">
-    <div class="friends-box">
-      <b style="font-size: 14px;">Friends List</b>
-      <hr>
-      <div id="friends-list"></div>
+<div id="outer-container">
+  <!-- NEWS SIDEBAR (left) -->
+  <div id="news-sidebar">
+    <div class="news-box">
+      <b>News</b>
+      <hr style="border-color: #555; margin: 6px 0;">
+      <div class="news-scroll" id="news-list">
+        <span style="color:#999; font-size:11px;">Loading news...</span>
+      </div>
     </div>
   </div>
 
-  <div id="wrap">
-    <div class="box">
-      <h1>BIG WALL</h1>
-      <span class="meta">Tell your friend to look at The Wall</span>
-    </div>
-
-    <!-- auth bar with notifications -->
-    <div id="auth-bar" class="box" style="display:none;">
-      <span>Signed in as <span id="user-label" class="author-link" onclick="viewOwnProfile()"></span></span>
-      &nbsp;&nbsp;<button class="notif-btn" onclick="openNotifications()">Notifications<span id="notif-badge" class="notif-badge" style="display:none;"></span></button>
-      &nbsp;<button onclick="openChangeNameModal()">Change Name</button>
-      &nbsp;<button onclick="openEditProfile()">Edit Profile</button>
-      &nbsp;<button onclick="doSignOut()">Sign Out</button>
-    </div>
-
-    <!-- login / register -->
-    <div id="login-box" class="box" style="display:none;">
-      <b id="auth-title">Sign In</b>
-      <hr>
-      <div id="auth-error" class="error" style="display:none;"></div>
-      <div id="reg-fields" style="display:none;">
-        <label>Display Name</label>
-        <input type="text" id="reg-name" maxlength="30">
-      </div>
-      <label>Email</label>
-      <input type="email" id="auth-email">
-      <label>Password</label>
-      <input type="password" id="auth-pass">
-      <button onclick="submitAuth()" id="auth-btn">Sign In</button>
-      &nbsp;
-      <span class="meta" id="toggle-msg">Are you a loser/No account?</span>
-      <a href="#" onclick="toggleMode(); return false;" id="toggle-link">Register</a>
-    </div>
-
-    <!-- new post -->
-    <div id="post-box" class="box" style="display:none;">
-      <b>Make a Post</b>
-      <hr>
-      <label>Title</label>
-      <input type="text" id="post-title" maxlength="500">
-      <div class="meta" style="text-align:right; margin-top:-4px; margin-bottom:6px;"><span id="title-count">0</span>/500</div>
-      <label>Body (Rich Text Editor)</label>
-      <div id="editor-container"></div>
-      <div class="meta" style="text-align:right; margin-top:4px; margin-bottom:6px;">
-        <span id="body-count">0</span> characters
-      </div>
-      <label>Tag</label>
-      <select id="post-tag">
-        <option value="general">general</option>
-        <option value="news">news</option>
-        <option value="random">random</option>
-        <option value="question">question</option>
-        <option value="rant">rant</option>
-        <option value="tutorial">tutorial</option>
-        <option value="showcase">showcase</option>
-      </select>
-      <button onclick="createPost()">Post</button>
-    </div>
-
-    <!-- search + sort -->
-    <div class="box">
-      <div class="search-row">
-        <input type="text" id="search-input" placeholder="Search by title or tag..." style="flex:1;">
-        <select id="sort-select" style="width:auto;">
-          <option value="new">Newest</option>
-          <option value="top">Top</option>
-          <option value="comments">Most Comments</option>
-        </select>
-        <button onclick="applySearch()">Search</button>
-        <button onclick="clearSearch()">Clear</button>
+  <div id="container">
+    <!-- Friends Sidebar -->
+    <div id="sidebar" style="display:none;">
+      <div class="friends-box">
+        <b style="font-size: 14px;">Friends List</b>
+        <hr>
+        <div id="friends-list"></div>
       </div>
     </div>
 
-    <div id="posts-area"><span class="meta">Loading...</span></div>
-    <div class="pagination" id="pagination"></div>
+    <div id="wrap">
+      <div class="box">
+        <h1>Floydian</h1>
+        <span class="meta">bro check Floydian</span>
+      </div>
+
+      <!-- auth bar with notifications -->
+      <div id="auth-bar" class="box" style="display:none;">
+        <span>Signed in as <span id="user-label" class="author-link" onclick="viewOwnProfile()"></span><span id="admin-badge-main" class="admin-badge" style="display:none;">ADMIN</span><span id="mod-badge-main" class="mod-badge" style="display:none;">MOD</span></span>
+        &nbsp;&nbsp;<button class="notif-btn" onclick="openNotifications()">Notifications<span id="notif-badge" class="notif-badge" style="display:none;"></span></button>
+        &nbsp;<button onclick="openChangeNameModal()">Change Name</button>
+        &nbsp;<button onclick="openEditProfile()">Edit Profile</button>
+        &nbsp;<button onclick="doSignOut()">Sign Out</button>
+      </div>
+
+      <!-- banned notice (shown instead of post box if banned) -->
+      <div id="banned-notice" class="banned-notice" style="display:none;">
+        >:/ You are banned. <span id="banned-until-msg"></span>
+      </div>
+
+      <!-- login / register -->
+      <div id="login-box" class="box" style="display:none;">
+        <b id="auth-title">Sign In</b>
+        <hr>
+        <div id="auth-error" class="error" style="display:none;"></div>
+        <div id="reg-fields" style="display:none;">
+          <label>Display Name</label>
+          <input type="text" id="reg-name" maxlength="30">
+        </div>
+        <label>Email</label>
+        <input type="email" id="auth-email">
+        <label>Password</label>
+        <input type="password" id="auth-pass">
+        <button onclick="submitAuth()" id="auth-btn">Sign In</button>
+        &nbsp;
+        <span class="meta" id="toggle-msg">Are you a loser/No account?</span>
+        <a href="#" onclick="toggleMode(); return false;" id="toggle-link">Register</a>
+      </div>
+
+      <!-- new post -->
+      <div id="post-box" class="box" style="display:none;">
+        <b>Make a Post</b>
+        <hr>
+        <!-- Post type toggle (only shown for admin) -->
+        <div id="post-type-toggle-wrap" style="display:none; margin-bottom:8px;">
+          <label>Post Type</label>
+          <div class="post-type-toggle">
+            <button class="post-type-btn active-regular" id="btn-regular-post" onclick="setPostType('regular')">Regular Post</button>
+            <button class="post-type-btn" id="btn-news-post" onclick="setPostType('news')">News Post</button>
+          </div>
+        </div>
+        <label>Title</label>
+        <input type="text" id="post-title" maxlength="500">
+        <div class="meta" style="text-align:right; margin-top:-4px; margin-bottom:6px;"><span id="title-count">0</span>/500</div>
+        <label>Body (Rich Text Editor)</label>
+        <div id="editor-container"></div>
+        <div class="meta" style="text-align:right; margin-top:4px; margin-bottom:6px;"><span id="body-count">0</span> characters</div>
+        <div id="tag-wrap">
+          <label>Tag</label>
+          <select id="post-tag">
+            <option value="general">general</option>
+            <option value="news">news</option>
+            <option value="random">random</option>
+            <option value="question">question</option>
+            <option value="rant">rant</option>
+            <option value="tutorial">tutorial</option>
+            <option value="showcase">showcase</option>
+          </select>
+        </div>
+        <button onclick="createPost()">Post</button>
+      </div>
+
+      <!-- search + sort -->
+      <div class="box">
+        <div class="search-row">
+          <input type="text" id="search-input" placeholder="Search by title or tag..." style="flex:1;">
+          <select id="sort-select" style="width:auto;">
+            <option value="new">Newest</option>
+            <option value="top">Top</option>
+            <option value="comments">Most Comments</option>
+          </select>
+          <button onclick="applySearch()">Search</button>
+          <button onclick="clearSearch()">Clear</button>
+        </div>
+      </div>
+
+      <div id="posts-area"><span class="meta">Loading...</span></div>
+      <div class="pagination" id="pagination"></div>
+    </div>
   </div>
 </div>
 
@@ -251,6 +278,14 @@
   <div class="modal">
     <div style="text-align:right;"><a href="#" onclick="closeModal('modal-bg'); return false;">[close]</a></div>
     <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- news post modal -->
+<div class="modal-bg" id="news-modal-bg">
+  <div class="modal" style="background:#1a1a1a; border-color:#cc9900;">
+    <div style="text-align:right;"><a href="#" onclick="closeModal('news-modal-bg'); return false;" style="color:#cc9900;">[close]</a></div>
+    <div id="news-modal-body"></div>
   </div>
 </div>
 
@@ -311,6 +346,35 @@
   </div>
 </div>
 
+<!-- Ban modal -->
+<div class="modal-bg" id="ban-modal-bg">
+  <div class="modal" style="max-width:400px;">
+    <div style="text-align:right;"><a href="#" onclick="closeModal('ban-modal-bg'); return false;">[close]</a></div>
+    <b>🚫 Ban User: <span id="ban-target-name"></span></b>
+    <hr>
+    <div id="ban-error" class="error" style="display:none;"></div>
+    <label>Ban Reason (optional)</label>
+    <input type="text" id="ban-reason" maxlength="200" placeholder="e.g. spam, harassment...">
+    <label>Ban Duration</label>
+    <div style="margin-bottom:8px;">
+      <label><input type="radio" name="ban-type" value="timed" id="ban-timed" checked> Temporary Ban</label>
+      <div class="ban-duration-row" id="ban-duration-row" style="margin-top:6px;">
+        <input type="number" id="ban-duration-val" min="1" value="1" style="width:80px; margin-bottom:0;">
+        <select id="ban-duration-unit" style="width:auto; margin-bottom:0;">
+          <option value="hours">Hours</option>
+          <option value="days" selected>Days</option>
+          <option value="weeks">Weeks</option>
+        </select>
+      </div>
+      <div style="margin-top:6px;">
+        <label><input type="radio" name="ban-type" value="forever" id="ban-forever"> Permanent Ban (forever)</label>
+      </div>
+    </div>
+    <button onclick="executeBan()" style="background:#8b0000; color:white; border-color:#8b0000;">Ban User</button>
+    <button onclick="closeModal('ban-modal-bg')" style="margin-left:6px;">Cancel</button>
+  </div>
+</div>
+
 <!-- Quill.js -->
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 
@@ -330,6 +394,9 @@
 
   const auth = getAuth(app);
   const db = getFirestore(app);
+  
+  const ADMIN_EMAIL = 'riverfromland@gmail.com';
+  
   let currentUser = null;
   let currentUserName = null;
   let isRegister = false;
@@ -343,6 +410,17 @@
   let followers = [];
   let following = [];
   let quill = null;
+  let isAdmin = false;
+  let isMod = false;   // set to true if user has isMod:true in their user doc (granted by admin only)
+  let currentPostType = 'regular'; // 'regular' or 'news'
+  let allNewsPosts = [];
+  let banTargetUid = null;
+  let banTargetNameStr = null;
+
+  // --- Role checks ---
+  function checkAdmin(user) { return user && user.email === ADMIN_EMAIL; }
+  // Mod powers: delete any post, ban users. Cannot: mod/unmod others, post news, pin posts.
+  function hasModPower() { return isAdmin || isMod; }
 
   // Initialize Quill editor
   function initQuill() {
@@ -359,26 +437,28 @@
       [{ 'font': [] }],
       ['clean']
     ];
-
     quill = new Quill('#editor-container', {
       theme: 'snow',
-      modules: {
-        toolbar: toolbarOptions
-      },
+      modules: { toolbar: toolbarOptions },
       placeholder: 'Write your post content here... (@mention friends)'
     });
-
-    // Update character count
     quill.on('text-change', function() {
       const text = quill.getText();
       document.getElementById('body-count').textContent = text.length;
     });
-    
-    // Setup @mention for Quill editor
     setupQuillMentions();
   }
   
-  // @mention autocomplete for Quill editor
+  // Post type toggle
+  window.setPostType = (type) => {
+    currentPostType = type;
+    document.getElementById('btn-regular-post').className = 'post-type-btn' + (type === 'regular' ? ' active-regular' : '');
+    document.getElementById('btn-news-post').className = 'post-type-btn' + (type === 'news' ? ' active-news' : '');
+    // Hide tag for news posts
+    document.getElementById('tag-wrap').style.display = type === 'news' ? 'none' : 'block';
+  };
+
+  // @mention for Quill
   function setupQuillMentions() {
     const editorContainer = document.querySelector('#editor-container .ql-editor');
     const dropdown = document.createElement('div');
@@ -387,83 +467,46 @@
     dropdown.style.position = 'fixed';
     dropdown.style.display = 'none';
     document.body.appendChild(dropdown);
-    
     let selectedIndex = -1;
     let mentionSearch = null;
-    
     quill.on('text-change', async function() {
       const selection = quill.getSelection();
       if (!selection) return;
-      
       const text = quill.getText(0, selection.index);
       const match = text.match(/@(\w*)$/);
-      
       if (match && friends.length > 0) {
         const searchTerm = match[1].toLowerCase();
         const friendsData = await Promise.all(friends.map(async (fid) => {
           const snap = await getDoc(doc(db, 'users', fid));
           return snap.exists() ? { id: fid, name: snap.data().displayName } : null;
         }));
-        
         const filtered = friendsData.filter(f => f && f.name.toLowerCase().includes(searchTerm));
-        
         if (filtered.length > 0) {
           selectedIndex = 0;
           mentionSearch = { start: selection.index - match[1].length - 1, length: match[0].length };
-          
-          dropdown.innerHTML = filtered.map((f, i) => 
-            `<div class="mention-item ${i === 0 ? 'selected' : ''}" data-name="${esc(f.name)}" data-index="${i}">${esc(f.name)}</div>`
-          ).join('');
+          dropdown.innerHTML = filtered.map((f, i) => `<div class="mention-item ${i === 0 ? 'selected' : ''}" data-name="${esc(f.name)}" data-index="${i}">${esc(f.name)}</div>`).join('');
           dropdown.style.display = 'block';
-          
           const bounds = quill.getBounds(selection.index);
           const editorRect = editorContainer.getBoundingClientRect();
           dropdown.style.left = (editorRect.left + bounds.left) + 'px';
           dropdown.style.bottom = (window.innerHeight - editorRect.top - bounds.top + 5) + 'px';
           dropdown.style.width = '200px';
           dropdown.style.top = 'auto';
-          
           dropdown.querySelectorAll('.mention-item').forEach(item => {
-            item.onclick = () => {
-              insertQuillMention(item.dataset.name);
-            };
+            item.onclick = () => { insertQuillMention(item.dataset.name); };
           });
-        } else {
-          dropdown.style.display = 'none';
-        }
-      } else {
-        dropdown.style.display = 'none';
-      }
+        } else { dropdown.style.display = 'none'; }
+      } else { dropdown.style.display = 'none'; }
     });
-    
     editorContainer.addEventListener('keydown', (e) => {
       if (dropdown.style.display === 'none') return;
-      
       const items = dropdown.querySelectorAll('.mention-item');
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-        updateQuillSelection(items);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        selectedIndex = Math.max(selectedIndex - 1, 0);
-        updateQuillSelection(items);
-      } else if (e.key === 'Enter' && selectedIndex >= 0 && items.length > 0) {
-        e.preventDefault();
-        e.stopPropagation();
-        const selected = items[selectedIndex];
-        insertQuillMention(selected.dataset.name);
-      } else if (e.key === 'Escape') {
-        dropdown.style.display = 'none';
-      }
+      if (e.key === 'ArrowDown') { e.preventDefault(); selectedIndex = Math.min(selectedIndex + 1, items.length - 1); updateQuillSelection(items); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); selectedIndex = Math.max(selectedIndex - 1, 0); updateQuillSelection(items); }
+      else if (e.key === 'Enter' && selectedIndex >= 0 && items.length > 0) { e.preventDefault(); e.stopPropagation(); insertQuillMention(items[selectedIndex].dataset.name); }
+      else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
     });
-    
-    function updateQuillSelection(items) {
-      items.forEach((item, i) => {
-        item.classList.toggle('selected', i === selectedIndex);
-      });
-    }
-    
+    function updateQuillSelection(items) { items.forEach((item, i) => { item.classList.toggle('selected', i === selectedIndex); }); }
     function insertQuillMention(name) {
       if (!mentionSearch) return;
       quill.deleteText(mentionSearch.start, mentionSearch.length);
@@ -478,13 +521,35 @@
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       currentUser = user;
+      isAdmin = checkAdmin(user);
+      if (isAdmin) window._adminUid = user.uid;
       const snap = await getDoc(doc(db, 'users', user.uid));
+      
+      // Check if banned
       if (snap.exists()) {
-        currentUserName = snap.data().displayName;
+        const userData = snap.data();
+        isMod = !isAdmin && !!userData.isMod; // admin can't also be "mod", they're above that
+        const banUntil = userData.bannedUntil;
+        const isBanned = banUntil && (banUntil === 'forever' || banUntil > Date.now());
+        if (isBanned && !isAdmin && !isMod) {
+          currentUserName = userData.displayName || user.email;
+          document.getElementById('user-label').textContent = currentUserName;
+          document.getElementById('auth-bar').style.display = 'block';
+          document.getElementById('login-box').style.display = 'none';
+          document.getElementById('post-box').style.display = 'none';
+          document.getElementById('sidebar').style.display = 'none';
+          const until = banUntil === 'forever' ? 'You are permanently banned.' : `Banned until ${new Date(banUntil).toLocaleString()}.`;
+          document.getElementById('banned-until-msg').textContent = until;
+          document.getElementById('banned-notice').style.display = 'block';
+          listenToNotifications(user.uid);
+          return;
+        }
+        currentUserName = userData.displayName;
       } else {
+        isMod = false;
         currentUserName = user.email;
-        await setDoc(doc(db, 'users', user.uid), { 
-          displayName: user.email, 
+        await setDoc(doc(db, 'users', user.uid), {
+          displayName: user.email,
           createdAt: serverTimestamp(),
           bio: '',
           profileColor: '#6b8e23',
@@ -492,30 +557,42 @@
           friendRequestsSent: [],
           friendRequestsReceived: [],
           followers: [],
-          following: []
+          following: [],
+          bannedUntil: null,
+          isMod: false
         });
       }
+      
       document.getElementById('user-label').textContent = currentUserName;
+      if (isAdmin) document.getElementById('admin-badge-main').style.display = 'inline-block';
+      if (isMod) document.getElementById('mod-badge-main').style.display = 'inline-block';
       document.getElementById('auth-bar').style.display = 'block';
       document.getElementById('login-box').style.display = 'none';
       document.getElementById('post-box').style.display = 'block';
       document.getElementById('sidebar').style.display = 'block';
+      document.getElementById('banned-notice').style.display = 'none';
       
-      // Initialize Quill when user is logged in
-      if (!quill) {
-        initQuill();
+      // Show post type toggle ONLY for admin (not mods)
+      if (isAdmin) {
+        document.getElementById('post-type-toggle-wrap').style.display = 'block';
       }
       
-      // Listen for notifications and friends
+      if (!quill) initQuill();
       listenToNotifications(user.uid);
       listenToFriends(user.uid);
     } else {
       currentUser = null;
       currentUserName = null;
+      isAdmin = false;
+      isMod = false;
       document.getElementById('auth-bar').style.display = 'none';
       document.getElementById('login-box').style.display = 'block';
       document.getElementById('post-box').style.display = 'none';
       document.getElementById('sidebar').style.display = 'none';
+      document.getElementById('banned-notice').style.display = 'none';
+      document.getElementById('post-type-toggle-wrap').style.display = 'none';
+      document.getElementById('mod-badge-main').style.display = 'none';
+      document.getElementById('admin-badge-main').style.display = 'none';
     }
   });
 
@@ -529,8 +606,9 @@
       if (isRegister) {
         const name = document.getElementById('reg-name').value.trim() || email;
         const cred = await createUserWithEmailAndPassword(auth, email, pass);
-        await setDoc(doc(db, 'users', cred.user.uid), { 
-          displayName: name, 
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          displayName: name,
+          email: email,
           createdAt: serverTimestamp(),
           bio: '',
           profileColor: '#6b8e23',
@@ -538,14 +616,14 @@
           friendRequestsSent: [],
           friendRequestsReceived: [],
           followers: [],
-          following: []
+          following: [],
+          bannedUntil: null,
+          isMod: false
         });
       } else {
         await signInWithEmailAndPassword(auth, email, pass);
       }
-    } catch (e) {
-      showErr('auth-error', e.message);
-    }
+    } catch (e) { showErr('auth-error', e.message); }
   };
 
   window.toggleMode = () => {
@@ -557,9 +635,7 @@
     document.getElementById('toggle-link').textContent = isRegister ? 'Sign In' : 'Register';
   };
 
-  window.doSignOut = async () => {
-    await fbSignOut(auth);
-  };
+  window.doSignOut = async () => { await fbSignOut(auth); };
 
   window.openChangeNameModal = () => {
     document.getElementById('new-name-input').value = '';
@@ -576,7 +652,6 @@
     closeModal('name-bg');
   };
 
-  // --- Edit Profile ---
   window.openEditProfile = async () => {
     const snap = await getDoc(doc(db, 'users', currentUser.uid));
     if (snap.exists()) {
@@ -591,19 +666,14 @@
   window.saveProfile = async () => {
     const bio = document.getElementById('bio-input').value.trim();
     const color = document.getElementById('color-input').value;
-    await updateDoc(doc(db, 'users', currentUser.uid), { 
-      bio: bio,
-      profileColor: color
-    });
+    await updateDoc(doc(db, 'users', currentUser.uid), { bio, profileColor: color });
     closeModal('edit-profile-bg');
   };
 
   document.getElementById('bio-input').addEventListener('input', updateBioCount);
   function updateBioCount() {
     const bioInput = document.getElementById('bio-input');
-    if (bioInput) {
-      document.getElementById('bio-count').textContent = bioInput.value.length;
-    }
+    if (bioInput) document.getElementById('bio-count').textContent = bioInput.value.length;
   }
 
   // --- Friends System ---
@@ -612,10 +682,7 @@
       if (!snap.exists()) return;
       const data = snap.data();
       friends = data.friends || [];
-      friendRequests = {
-        sent: data.friendRequestsSent || [],
-        received: data.friendRequestsReceived || []
-      };
+      friendRequests = { sent: data.friendRequestsSent || [], received: data.friendRequestsReceived || [] };
       followers = data.followers || [];
       following = data.following || [];
       await renderFriendsList();
@@ -624,144 +691,67 @@
 
   async function renderFriendsList() {
     const el = document.getElementById('friends-list');
-    if (!friends.length) {
-      el.innerHTML = '<span class="meta">No friends yet</span>';
-      return;
-    }
-    
+    if (!friends.length) { el.innerHTML = '<span class="meta">No friends yet</span>'; return; }
     const friendsData = await Promise.all(friends.map(async (fid) => {
       const userSnap = await getDoc(doc(db, 'users', fid));
       if (!userSnap.exists()) return null;
       const userData = userSnap.data();
-      
-      // Get their most recent post
       const userPosts = allPosts.filter(p => p.authorId === fid);
       const recentPost = userPosts.length > 0 ? userPosts[0].title : 'No posts yet';
-      
       return { id: fid, name: userData.displayName, recentPost };
     }));
-    
     el.innerHTML = friendsData.filter(f => f).map(f => `
       <div class="friend-item" onclick="openProfile('${f.id}', '${esc(f.name)}')">
         <div class="friend-name">${esc(f.name)}</div>
         <div class="friend-recent">${esc(f.recentPost)}</div>
-      </div>
-    `).join('');
+      </div>`).join('');
   }
 
   window.sendFriendRequest = async (targetUid, targetName) => {
-    if (friends.includes(targetUid)) {
-      alert('Already friends!');
-      return;
-    }
-    if (friendRequests.sent.includes(targetUid)) {
-      alert('Request already sent!');
-      return;
-    }
-    
-    // Add to your sent list
-    await updateDoc(doc(db, 'users', currentUser.uid), {
-      friendRequestsSent: arrayUnion(targetUid)
-    });
-    
-    // Add to their received list
-    await updateDoc(doc(db, 'users', targetUid), {
-      friendRequestsReceived: arrayUnion(currentUser.uid)
-    });
-    
-    // Send notification
+    if (friends.includes(targetUid)) { alert('Already friends!'); return; }
+    if (friendRequests.sent.includes(targetUid)) { alert('Request already sent!'); return; }
+    await updateDoc(doc(db, 'users', currentUser.uid), { friendRequestsSent: arrayUnion(targetUid) });
+    await updateDoc(doc(db, 'users', targetUid), { friendRequestsReceived: arrayUnion(currentUser.uid) });
     await createNotification(targetUid, `${currentUserName} sent you a friend request`, null, 'friend_request', currentUser.uid);
-    
     showSuccessToast('Friend request sent!');
-    
-    // Auto-refresh profile to update buttons
-    setTimeout(() => {
-      openProfile(targetUid, targetName);
-    }, 100);
+    setTimeout(() => openProfile(targetUid, targetName), 100);
   };
 
   window.acceptFriendRequest = async (requesterUid) => {
-    // Add each other to friends lists
-    await updateDoc(doc(db, 'users', currentUser.uid), {
-      friends: arrayUnion(requesterUid),
-      friendRequestsReceived: arrayRemove(requesterUid)
-    });
-    
-    await updateDoc(doc(db, 'users', requesterUid), {
-      friends: arrayUnion(currentUser.uid),
-      friendRequestsSent: arrayRemove(currentUser.uid)
-    });
-    
-    // Notify them
+    await updateDoc(doc(db, 'users', currentUser.uid), { friends: arrayUnion(requesterUid), friendRequestsReceived: arrayRemove(requesterUid) });
+    await updateDoc(doc(db, 'users', requesterUid), { friends: arrayUnion(currentUser.uid), friendRequestsSent: arrayRemove(currentUser.uid) });
     await createNotification(requesterUid, `${currentUserName} accepted your friend request!`, null, 'friend_accept');
-    
     closeModal('profile-bg');
   };
 
   window.declineFriendRequest = async (requesterUid) => {
-    await updateDoc(doc(db, 'users', currentUser.uid), {
-      friendRequestsReceived: arrayRemove(requesterUid)
-    });
-    
-    await updateDoc(doc(db, 'users', requesterUid), {
-      friendRequestsSent: arrayRemove(currentUser.uid)
-    });
-    
+    await updateDoc(doc(db, 'users', currentUser.uid), { friendRequestsReceived: arrayRemove(requesterUid) });
+    await updateDoc(doc(db, 'users', requesterUid), { friendRequestsSent: arrayRemove(currentUser.uid) });
     closeModal('profile-bg');
   };
 
   window.removeFriend = async (friendUid) => {
     if (!confirm('Remove this friend?')) return;
-    
-    await updateDoc(doc(db, 'users', currentUser.uid), {
-      friends: arrayRemove(friendUid)
-    });
-    
-    await updateDoc(doc(db, 'users', friendUid), {
-      friends: arrayRemove(currentUser.uid)
-    });
-    
+    await updateDoc(doc(db, 'users', currentUser.uid), { friends: arrayRemove(friendUid) });
+    await updateDoc(doc(db, 'users', friendUid), { friends: arrayRemove(currentUser.uid) });
     closeModal('profile-bg');
   };
 
   // --- Follow System ---
   window.followUser = async (targetUid, targetName) => {
-    if (following.includes(targetUid)) {
-      alert('Already following!');
-      return;
-    }
-    
-    await updateDoc(doc(db, 'users', currentUser.uid), {
-      following: arrayUnion(targetUid)
-    });
-    
-    await updateDoc(doc(db, 'users', targetUid), {
-      followers: arrayUnion(currentUser.uid)
-    });
-    
+    if (following.includes(targetUid)) { alert('Already following!'); return; }
+    await updateDoc(doc(db, 'users', currentUser.uid), { following: arrayUnion(targetUid) });
+    await updateDoc(doc(db, 'users', targetUid), { followers: arrayUnion(currentUser.uid) });
     await createNotification(targetUid, `${currentUserName} started following you!`, null, 'follow');
-    
     showSuccessToast(`You're now following ${targetName}!`);
-    
-    // Auto-refresh profile to update buttons
-    setTimeout(() => {
-      openProfile(targetUid, targetName);
-    }, 100);
+    setTimeout(() => openProfile(targetUid, targetName), 100);
   };
 
   window.unfollowUser = async (targetUid) => {
     if (!confirm('Unfollow this user?')) return;
-    
-    await updateDoc(doc(db, 'users', currentUser.uid), {
-      following: arrayRemove(targetUid)
-    });
-    
-    await updateDoc(doc(db, 'users', targetUid), {
-      followers: arrayRemove(currentUser.uid)
-    });
-    
+    await updateDoc(doc(db, 'users', currentUser.uid), { following: arrayRemove(targetUid) });
+    await updateDoc(doc(db, 'users', targetUid), { followers: arrayRemove(currentUser.uid) });
     showSuccessToast('Unfollowed successfully!');
-    
     closeModal('profile-bg');
   };
 
@@ -771,58 +761,40 @@
     onSnapshot(q, (snap) => {
       const unread = snap.docs.filter(d => !d.data().read).length;
       const badge = document.getElementById('notif-badge');
-      if (unread > 0) {
-        badge.textContent = unread;
-        badge.style.display = 'inline-block';
-      } else {
-        badge.style.display = 'none';
-      }
+      if (unread > 0) { badge.textContent = unread; badge.style.display = 'inline-block'; }
+      else { badge.style.display = 'none'; }
     });
   }
 
   window.openNotifications = async () => {
     document.getElementById('notif-body').innerHTML = '<span class="meta">Loading...</span>';
     document.getElementById('notif-bg').style.display = 'block';
-    
     const q = query(collection(db, 'notifications'), where('recipientId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
     const snap = await getDocs(q);
-    
-    if (snap.empty) {
-      document.getElementById('notif-body').innerHTML = '<span class="meta">No notifications yet.</span>';
-      return;
-    }
-    
+    if (snap.empty) { document.getElementById('notif-body').innerHTML = '<span class="meta">No notifications yet.</span>'; return; }
     const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     let html = '<button onclick="clearAllNotifications()" style="margin-bottom:8px;">Clear All</button><hr>';
     html += notifs.map(n => {
       const timeAgo = n.createdAt ? getTimeAgo(n.createdAt.seconds * 1000) : 'just now';
-      let clickAction = n.postId ? `handleNotifClick('${n.id}', '${n.postId}', '')` : 
-                        n.type === 'friend_request' ? `handleNotifClick('${n.id}', '', '${n.requesterId}')` : 
+      let clickAction = n.postId ? `handleNotifClick('${n.id}', '${n.postId}', '')` :
+                        n.type === 'friend_request' ? `handleNotifClick('${n.id}', '', '${n.requesterId}')` :
                         `markNotifRead('${n.id}')`;
-      return `
-        <div class="notif-item ${n.read ? '' : 'unread'}" style="display:flex; justify-content:space-between; align-items:center;">
-          <div style="flex:1; cursor:pointer;" onclick="${clickAction}">
-            ${esc(n.message)}
-            <span class="notif-time">${timeAgo}</span>
-          </div>
-          <button class="del-btn" style="margin-left:8px; font-size:14px;" onclick="event.stopPropagation(); dismissNotif('${n.id}')">✕</button>
-        </div>
-      `;
+      return `<div class="notif-item ${n.read ? '' : 'unread'}" style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="flex:1; cursor:pointer;" onclick="${clickAction}">${esc(n.message)}<span class="notif-time">${timeAgo}</span></div>
+        <button class="del-btn" style="margin-left:8px; font-size:14px;" onclick="event.stopPropagation(); dismissNotif('${n.id}')">✕</button>
+      </div>`;
     }).join('');
     document.getElementById('notif-body').innerHTML = html;
-    
-    // Mark all as read
-    for (const d of snap.docs) {
-      if (!d.data().read) {
-        await updateDoc(doc(db, 'notifications', d.id), { read: true });
-      }
-    }
+    for (const d of snap.docs) { if (!d.data().read) await updateDoc(doc(db, 'notifications', d.id), { read: true }); }
   };
 
   window.handleNotifClick = async (notifId, postId, requesterId) => {
     closeModal('notif-bg');
     if (postId) {
-      openPost(postId);
+      // Check if it's a news post or regular post
+      const newsSnap = await getDoc(doc(db, 'newsPosts', postId));
+      if (newsSnap.exists()) openNewsPost(postId);
+      else openPost(postId);
     } else if (requesterId) {
       const userSnap = await getDoc(doc(db, 'users', requesterId));
       const name = userSnap.exists() ? userSnap.data().displayName : 'User';
@@ -830,21 +802,13 @@
     }
   };
 
-  window.markNotifRead = async (notifId) => {
-    await updateDoc(doc(db, 'notifications', notifId), { read: true });
-  };
-
-  window.dismissNotif = async (notifId) => {
-    await deleteDoc(doc(db, 'notifications', notifId));
-  };
-
+  window.markNotifRead = async (notifId) => { await updateDoc(doc(db, 'notifications', notifId), { read: true }); };
+  window.dismissNotif = async (notifId) => { await deleteDoc(doc(db, 'notifications', notifId)); };
   window.clearAllNotifications = async () => {
     if (!confirm('Clear all notifications?')) return;
     const q = query(collection(db, 'notifications'), where('recipientId', '==', currentUser.uid));
     const snap = await getDocs(q);
-    for (const d of snap.docs) {
-      await deleteDoc(doc(db, 'notifications', d.id));
-    }
+    for (const d of snap.docs) await deleteDoc(doc(db, 'notifications', d.id));
     document.getElementById('notif-body').innerHTML = '<span class="meta">No notifications yet.</span>';
   };
 
@@ -861,23 +825,164 @@
 
   async function createNotification(recipientId, message, postId = null, type = 'default', requesterId = null) {
     if (recipientId === currentUser.uid) return;
-    await addDoc(collection(db, 'notifications'), {
-      recipientId,
-      message,
-      postId,
-      type,
-      requesterId,
-      createdAt: serverTimestamp(),
-      read: false
-    });
+    await addDoc(collection(db, 'notifications'), { recipientId, message, postId, type, requesterId, createdAt: serverTimestamp(), read: false });
   }
 
-  // --- Posts ---
-  const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-  onSnapshot(q, (snap) => {
+  // --- BAN SYSTEM ---
+  window.openBanModal = (uid, name) => {
+    if (!hasModPower()) return;
+    banTargetUid = uid;
+    banTargetNameStr = name;
+    document.getElementById('ban-target-name').textContent = name;
+    document.getElementById('ban-reason').value = '';
+    document.getElementById('ban-error').style.display = 'none';
+    document.getElementById('ban-timed').checked = true;
+    document.getElementById('ban-duration-row').style.display = 'flex';
+    document.getElementById('ban-duration-val').value = '1';
+    document.getElementById('ban-duration-unit').value = 'days';
+    document.getElementById('ban-modal-bg').style.display = 'block';
+    // Radio toggle
+    document.querySelectorAll('input[name="ban-type"]').forEach(r => {
+      r.addEventListener('change', () => {
+        document.getElementById('ban-duration-row').style.display = r.value === 'timed' ? 'flex' : 'none';
+      });
+    });
+  };
+
+  window.executeBan = async () => {
+    if (!hasModPower() || !banTargetUid) return;
+    const banType = document.querySelector('input[name="ban-type"]:checked').value;
+    let banUntil;
+    if (banType === 'forever') {
+      banUntil = 'forever';
+    } else {
+      const val = parseInt(document.getElementById('ban-duration-val').value);
+      const unit = document.getElementById('ban-duration-unit').value;
+      if (!val || val < 1) { showErr('ban-error', 'Enter a valid duration.'); return; }
+      let ms = val;
+      if (unit === 'hours') ms *= 3600000;
+      else if (unit === 'days') ms *= 86400000;
+      else if (unit === 'weeks') ms *= 604800000;
+      banUntil = Date.now() + ms;
+    }
+    const reason = document.getElementById('ban-reason').value.trim();
+    await updateDoc(doc(db, 'users', banTargetUid), { bannedUntil: banUntil, banReason: reason || '' });
+    closeModal('ban-modal-bg');
+    closeModal('profile-bg');
+    showSuccessToast(`${banTargetNameStr} has been banned.`);
+  };
+
+  window.unbanUser = async (uid, name) => {
+    if (!hasModPower()) return;
+    if (!confirm(`Unban ${name}?`)) return;
+    await updateDoc(doc(db, 'users', uid), { bannedUntil: null, banReason: '' });
+    showSuccessToast(`${name} has been unbanned.`);
+    closeModal('profile-bg');
+  };
+
+  // --- MOD SYSTEM (admin only can grant/revoke) ---
+  window.makeMod = async (uid, name) => {
+    if (!isAdmin) return;
+    if (!confirm(`Make ${name} a moderator?`)) return;
+    await updateDoc(doc(db, 'users', uid), { isMod: true });
+    showSuccessToast(`${name} is now a MOD! 🛡️`);
+    closeModal('profile-bg');
+  };
+
+  window.removeMod = async (uid, name) => {
+    if (!isAdmin) return;
+    if (!confirm(`Remove mod status from ${name}?`)) return;
+    await updateDoc(doc(db, 'users', uid), { isMod: false });
+    showSuccessToast(`${name} is no longer a mod.`);
+    closeModal('profile-bg');
+  };
+
+  // --- NEWS POSTS ---
+  // Listen to news posts
+  const newsQuery = query(collection(db, 'newsPosts'), orderBy('createdAt', 'desc'));
+  onSnapshot(newsQuery, (snap) => {
+    allNewsPosts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderNewsSidebar();
+  });
+
+  function renderNewsSidebar() {
+    const el = document.getElementById('news-list');
+    if (!allNewsPosts.length) {
+      el.innerHTML = '<span style="color:#888; font-size:11px;">No news yet.</span>';
+      return;
+    }
+    el.innerHTML = allNewsPosts.map(n => {
+      const ts = n.createdAt ? getTimeAgo(n.createdAt.seconds * 1000) : 'just now';
+      const preview = n.contentPlainText ? n.contentPlainText.substring(0, 80) + (n.contentPlainText.length > 80 ? '...' : '') : '';
+      return `
+        <div class="news-item" onclick="openNewsPost('${n.id}')">
+          <div class="news-badge">NEWS</div>
+          <div class="news-item-title">${esc(n.title)}</div>
+          ${preview ? `<div class="news-item-preview">${esc(preview)}</div>` : ''}
+          <div class="news-item-meta">${ts}</div>
+        </div>`;
+    }).join('');
+  }
+
+  window.openNewsPost = async (id) => {
+    const snap = await getDoc(doc(db, 'newsPosts', id));
+    if (!snap.exists()) { alert('News post not found.'); return; }
+    const post = snap.data();
+    const ts = post.createdAt ? new Date(post.createdAt.seconds * 1000).toLocaleString() : 'just now';
+    const score = (post.upvotes?.length || 0) - (post.downvotes?.length || 0);
+    const isUp = currentUser && post.upvotes?.includes(currentUser.uid);
+    const isDn = currentUser && post.downvotes?.includes(currentUser.uid);
+
+    document.getElementById('news-modal-body').innerHTML = `
+      <div style="margin-bottom:8px;"><span class="news-badge" style="font-size:12px;">NEWS!!</span></div>
+      <b style="font-size:18px; color:#cc9900;">${esc(post.title)}</b>
+      <div class="meta" style="margin:4px 0 10px; color:#999;">
+        by <span style="color:#cc9900; font-weight:bold;">${esc(post.authorName)}</span> &bull; ${ts}
+      </div>
+      <div class="post-content" style="background:#2a2a2a; border-color:#555; color:#f0e8d0;">${post.content}</div>
+      <div style="margin-top:12px;">
+        <button onclick="voteNews('${id}','up')" ${isUp ? 'style="font-weight:bold;"' : ''}>+ up</button>
+        <b style="margin:0 6px; color:#f0e8d0;">${score}</b>
+        <button onclick="voteNews('${id}','down')" ${isDn ? 'style="font-weight:bold;"' : ''}>- down</button>
+        ${isAdmin ? `<button class="del-btn" style="margin-left:12px; color:#ff6666;" onclick="deleteNewsPost('${id}'); closeModal('news-modal-bg');">delete</button>` : ''}
+      </div>
+    `;
+    document.getElementById('news-modal-bg').style.display = 'block';
+  };
+
+  window.voteNews = async (id, type) => {
+    if (!currentUser) return;
+    const ref = doc(db, 'newsPosts', id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const uid = currentUser.uid;
+    const upvotes = data.upvotes || [];
+    const downvotes = data.downvotes || [];
+    const isUp = upvotes.includes(uid);
+    const isDn = downvotes.includes(uid);
+    if (type === 'up') {
+      if (isUp) await updateDoc(ref, { upvotes: arrayRemove(uid) });
+      else await updateDoc(ref, { upvotes: arrayUnion(uid), downvotes: arrayRemove(uid) });
+    } else {
+      if (isDn) await updateDoc(ref, { downvotes: arrayRemove(uid) });
+      else await updateDoc(ref, { downvotes: arrayUnion(uid), upvotes: arrayRemove(uid) });
+    }
+    openNewsPost(id);
+  };
+
+  window.deleteNewsPost = async (id) => {
+    if (!isAdmin) return;
+    if (!confirm('Delete this news post?')) return;
+    await deleteDoc(doc(db, 'newsPosts', id));
+  };
+
+  // --- POSTS ---
+  const postsQ = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+  onSnapshot(postsQ, (snap) => {
     allPosts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     applyFilters();
-    renderFriendsList(); // Update friends' recent posts
+    renderFriendsList();
   });
 
   window.createPost = async () => {
@@ -885,44 +990,41 @@
     const contentHTML = quill.root.innerHTML;
     const contentText = quill.getText().trim();
     const tag = document.getElementById('post-tag').value;
-    
-    if (!title) {
-      alert('Title required.');
-      return;
-    }
-    
-    if (!contentText || contentText.length < 2) {
-      alert('Post body required.');
-      return;
-    }
-    
-    const postRef = await addDoc(collection(db, 'posts'), {
-      title, 
-      content: contentHTML,
-      contentPlainText: contentText,
-      tag,
-      authorId: currentUser.uid,
-      authorName: currentUserName,
-      createdAt: serverTimestamp(),
-      upvotes: [],
-      downvotes: [],
-      comments: [],
-      pinnedComment: null
-    });
-    
-    // Notify followers about the new post
-    const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
-    if (userSnap.exists()) {
-      const userData = userSnap.data();
-      const myFollowers = userData.followers || [];
-      for (const followerId of myFollowers) {
-        await createNotification(followerId, `${currentUserName} posted: "${title}"`, postRef.id, 'new_post');
+    if (!title) { alert('Title required.'); return; }
+    if (!contentText || contentText.length < 2) { alert('Post body required.'); return; }
+
+    if (currentPostType === 'news') {
+      // Only admin can post news
+      if (!isAdmin) { alert('Only the admin can post news!'); return; }
+      await addDoc(collection(db, 'newsPosts'), {
+        title,
+        content: contentHTML,
+        contentPlainText: contentText,
+        authorId: currentUser.uid,
+        authorName: currentUserName,
+        createdAt: serverTimestamp(),
+        upvotes: [],
+        downvotes: []
+      });
+      showSuccessToast('News post published!');
+    } else {
+      const postRef = await addDoc(collection(db, 'posts'), {
+        title, content: contentHTML, contentPlainText: contentText, tag,
+        authorId: currentUser.uid, authorName: currentUserName,
+        createdAt: serverTimestamp(),
+        upvotes: [], downvotes: [], comments: [], pinnedComment: null,
+        pinned: false
+      });
+      const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
+      if (userSnap.exists()) {
+        const myFollowers = userSnap.data().followers || [];
+        for (const followerId of myFollowers) {
+          await createNotification(followerId, `${currentUserName} posted: "${title}"`, postRef.id, 'new_post');
+        }
       }
+      await notifyMentionedUsers(contentText, postRef.id, title);
     }
-    
-    // Handle @mentions in the post
-    await notifyMentionedUsers(contentText, postRef.id, title);
-    
+
     document.getElementById('post-title').value = '';
     quill.setContents([]);
     document.getElementById('title-count').textContent = '0';
@@ -932,6 +1034,19 @@
   document.getElementById('post-title').addEventListener('input', () => {
     document.getElementById('title-count').textContent = document.getElementById('post-title').value.length;
   });
+
+  // --- Admin: Pin Post ---
+  window.pinPost = async (id) => {
+    if (!isAdmin) return;
+    await updateDoc(doc(db, 'posts', id), { pinned: true });
+    showSuccessToast('Post pinned!');
+  };
+
+  window.unpinPost = async (id) => {
+    if (!isAdmin) return;
+    await updateDoc(doc(db, 'posts', id), { pinned: false });
+    showSuccessToast('Post unpinned.');
+  };
 
   window.vote = async (id, type) => {
     if (!currentUser) return;
@@ -944,16 +1059,12 @@
     const downvotes = data.downvotes || [];
     const isUp = upvotes.includes(uid);
     const isDn = downvotes.includes(uid);
-    
     const isNewUpvote = type === 'up' && !isUp;
-    
     if (type === 'up') {
       if (isUp) await updateDoc(ref, { upvotes: arrayRemove(uid) });
       else {
         await updateDoc(ref, { upvotes: arrayUnion(uid), downvotes: arrayRemove(uid) });
-        if (isNewUpvote) {
-          await createNotification(data.authorId, `${currentUserName} upvoted your post: "${data.title}"`, id);
-        }
+        if (isNewUpvote) await createNotification(data.authorId, `${currentUserName} upvoted your post: "${data.title}"`, id);
       }
     } else {
       if (isDn) await updateDoc(ref, { downvotes: arrayRemove(uid) });
@@ -962,9 +1073,12 @@
     if (window.currentPostId === id) openPost(id);
   };
 
+  // Admin can delete ANY post
   window.deletePost = async (id) => {
+    if (!currentUser) return;
     if (!confirm('Delete this post?')) return;
     await deleteDoc(doc(db, 'posts', id));
+    if (window.currentPostId === id) closeModal('modal-bg');
   };
 
   // --- Filters ---
@@ -980,22 +1094,21 @@
     const sortMode = document.getElementById('sort-select').value;
     let posts = [...allPosts];
     if (searchTerm) {
-      posts = posts.filter(p => 
-        p.title.toLowerCase().includes(searchTerm) || 
+      posts = posts.filter(p =>
+        p.title.toLowerCase().includes(searchTerm) ||
         (p.tag && p.tag.toLowerCase().includes(searchTerm)) ||
         (p.contentPlainText && p.contentPlainText.toLowerCase().includes(searchTerm))
       );
     }
     if (sortMode === 'top') {
-      posts.sort((a, b) => {
-        const aScore = (a.upvotes?.length || 0) - (a.downvotes?.length || 0);
-        const bScore = (b.upvotes?.length || 0) - (b.downvotes?.length || 0);
-        return bScore - aScore;
-      });
+      posts.sort((a, b) => ((b.upvotes?.length||0)-(b.downvotes?.length||0)) - ((a.upvotes?.length||0)-(a.downvotes?.length||0)));
     } else if (sortMode === 'comments') {
-      posts.sort((a, b) => (b.comments?.length || 0) - (a.comments?.length || 0));
+      posts.sort((a, b) => (b.comments?.length||0) - (a.comments?.length||0));
     }
-    filteredPosts = posts;
+    // Pinned posts always float to top (maintaining sort within pinned group)
+    const pinned = posts.filter(p => p.pinned);
+    const unpinned = posts.filter(p => !p.pinned);
+    filteredPosts = [...pinned, ...unpinned];
     currentPage = 0;
     renderPosts();
   }
@@ -1010,23 +1123,32 @@
       return;
     }
     document.getElementById('posts-area').innerHTML = page.map(p => {
-      const score = (p.upvotes?.length || 0) - (p.downvotes?.length || 0);
+      const score = (p.upvotes?.length||0) - (p.downvotes?.length||0);
       const ts = p.createdAt ? new Date(p.createdAt.seconds * 1000).toLocaleString() : 'just now';
-      
-      // Get preview text (first 150 chars of plain text)
       const preview = p.contentPlainText ? (p.contentPlainText.substring(0, 150) + (p.contentPlainText.length > 150 ? '...' : '')) : '';
-      
+      const isOwner = currentUser && currentUser.uid === p.authorId;
+      const adminActions = isAdmin ? `
+        ${p.pinned
+          ? `<button class="pin-btn" style="background:none; border:none; cursor:pointer; font-size:11px; color:#cc9900; padding:0; margin-left:8px;" onclick="unpinPost('${p.id}')">📌 unpin</button>`
+          : `<button class="pin-btn" style="background:none; border:none; cursor:pointer; font-size:11px; color:#999; padding:0; margin-left:8px;" onclick="pinPost('${p.id}')">📌 pin</button>`
+        }
+        ${!isOwner ? `<button class="del-btn" style="margin-left:8px;" onclick="deletePost('${p.id}')">delete</button>` : ''}
+      ` : '';
+      const modDeleteBtn = (!isAdmin && isMod && !isOwner) ? `<button class="del-btn" style="margin-left:8px;" onclick="deletePost('${p.id}')">delete</button>` : '';
+      const ownerDelete = isOwner ? `<button class="del-btn" style="margin-left:8px;" onclick="deletePost('${p.id}')">delete</button>` : '';
       return `
-        <div class="post">
-          <div class="post-title" onclick="openPost('${p.id}')">${esc(p.title)}</div>
+        <div class="post ${p.pinned ? 'pinned-post' : ''}">
+          <div class="post-title" onclick="openPost('${p.id}')">
+            ${p.pinned ? '<span class="post-pin-badge">📌 PINNED</span>' : ''}${esc(p.title)}
+          </div>
           ${preview ? `<div class="meta" style="margin-top:4px;">${esc(preview)}</div>` : ''}
           <div class="meta" style="margin-top:4px;">
-            <span class="tag">${esc(p.tag || 'general')}</span>
+            <span class="tag">${esc(p.tag||'general')}</span>
             by <span class="author-link" onclick="openProfile('${esc(p.authorId)}','${esc(p.authorName)}')">${esc(p.authorName)}</span>
-            &bull; ${ts} &bull; score: ${score} &bull; ${p.comments?.length || 0} comments
+            &bull; ${ts} &bull; score: ${score} &bull; ${p.comments?.length||0} comments
+            ${ownerDelete}${modDeleteBtn}${adminActions}
           </div>
-        </div>
-      `;
+        </div>`;
     }).join('');
     renderPagination();
   }
@@ -1036,8 +1158,7 @@
     if (total <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
     let html = '';
     for (let i = 0; i < total; i++) {
-      const style = i === currentPage ? 'font-weight:bold;' : '';
-      html += `<button style="${style}" onclick="goToPage(${i})">${i + 1}</button>`;
+      html += `<button style="${i === currentPage ? 'font-weight:bold;' : ''}" onclick="goToPage(${i})">${i + 1}</button>`;
     }
     document.getElementById('pagination').innerHTML = html;
   }
@@ -1050,16 +1171,26 @@
     const snap = await getDoc(doc(db, 'posts', id));
     if (!snap.exists()) { alert('Post not found.'); return; }
     const post = snap.data();
-    const score = (post.upvotes?.length || 0) - (post.downvotes?.length || 0);
+    const score = (post.upvotes?.length||0) - (post.downvotes?.length||0);
     const ts = post.createdAt ? new Date(post.createdAt.seconds * 1000).toLocaleString() : 'just now';
     const isUp = currentUser && post.upvotes?.includes(currentUser.uid);
     const isDn = currentUser && post.downvotes?.includes(currentUser.uid);
     const isOwner = currentUser && currentUser.uid === post.authorId;
 
+    const adminPostControls = isAdmin ? `
+      ${post.pinned
+        ? `<button class="pin-btn" style="margin-left:8px;" onclick="unpinPost('${id}'); closeModal('modal-bg')">📌 Unpin Post</button>`
+        : `<button class="pin-btn" style="margin-left:8px;" onclick="pinPost('${id}'); closeModal('modal-bg')">📌 Pin Post</button>`
+      }
+      ${!isOwner ? `<button class="del-btn" style="margin-left:12px;" onclick="deletePost('${id}')">delete post</button>` : ''}
+    ` : '';
+    const modPostControls = (!isAdmin && isMod && !isOwner) ? `<button class="del-btn" style="margin-left:12px;" onclick="deletePost('${id}')">delete post</button>` : '';
+
     document.getElementById('modal-body').innerHTML = `
+      ${post.pinned ? '<div style="color:#cc9900; font-weight:bold; margin-bottom:6px;">📌 PINNED POST</div>' : ''}
       <b style="font-size:16px;">${esc(post.title)}</b>
       <div class="meta" style="margin:4px 0 10px;">
-        <span class="tag">${esc(post.tag || 'general')}</span>
+        <span class="tag">${esc(post.tag||'general')}</span>
         by <span class="author-link" onclick="openProfile('${esc(post.authorId)}','${esc(post.authorName)}')">${esc(post.authorName)}</span>
         &bull; ${ts}${post.edited ? ' <i>(edited)</i>' : ''}
       </div>
@@ -1068,10 +1199,12 @@
         <button onclick="vote('${id}','up')" ${isUp ? 'style="font-weight:bold;"' : ''}>+ up</button>
         <b style="margin:0 6px;">${score}</b>
         <button onclick="vote('${id}','down')" ${isDn ? 'style="font-weight:bold;"' : ''}>- down</button>
-        ${isOwner ? `<button class="del-btn" style="margin-left:12px;" onclick="deletePost('${id}'); closeModal('modal-bg');">delete post</button>` : ''}
+        ${isOwner ? `<button class="del-btn" style="margin-left:12px;" onclick="deletePost('${id}')">delete post</button>` : ''}
+        ${modPostControls}
+        ${adminPostControls}
       </div>
       <hr>
-      <b>Comments (${post.comments?.length || 0})</b>
+      <b>Comments (${post.comments?.length||0})</b>
       <div id="comment-list" style="margin-top:8px;"></div>
       ${currentUser
         ? `<div style="margin-top:8px; position:relative;">
@@ -1083,95 +1216,59 @@
     `;
     renderComments(post.comments || [], id, post.pinnedComment);
     document.getElementById('modal-bg').style.display = 'block';
-    
-    if (currentUser) {
-      setupMentionAutocomplete('comment-input');
-    }
+    if (currentUser) setupMentionAutocomplete('comment-input');
   };
 
   // --- @ Mention Autocomplete ---
   function setupMentionAutocomplete(textareaId) {
     const textarea = document.getElementById(textareaId);
     if (!textarea) return;
-    
     const dropdownId = textareaId.replace('input', 'dropdown').replace('reply-input', 'mention-dropdown');
     const dropdown = document.getElementById(dropdownId);
     if (!dropdown) return;
-    
     let selectedIndex = -1;
-    
     textarea.addEventListener('input', async (e) => {
       const text = e.target.value;
       const cursorPos = e.target.selectionStart;
       const textBeforeCursor = text.substring(0, cursorPos);
       const match = textBeforeCursor.match(/@(\w*)$/);
-      
       if (match && friends.length > 0) {
         const searchTerm = match[1].toLowerCase();
         const friendsData = await Promise.all(friends.map(async (fid) => {
           const snap = await getDoc(doc(db, 'users', fid));
           return snap.exists() ? { id: fid, name: snap.data().displayName } : null;
         }));
-        
         const filtered = friendsData.filter(f => f && f.name.toLowerCase().includes(searchTerm));
-        
         if (filtered.length > 0) {
           selectedIndex = 0;
-          dropdown.innerHTML = filtered.map((f, i) => 
+          dropdown.innerHTML = filtered.map((f, i) =>
             `<div class="mention-item ${i === 0 ? 'selected' : ''}" data-name="${esc(f.name)}" data-index="${i}">${esc(f.name)}</div>`
           ).join('');
           dropdown.style.display = 'block';
-          
           const rect = textarea.getBoundingClientRect();
           dropdown.style.position = 'fixed';
           dropdown.style.left = rect.left + 'px';
           dropdown.style.bottom = (window.innerHeight - rect.top + 5) + 'px';
           dropdown.style.width = rect.width + 'px';
           dropdown.style.top = 'auto';
-          
           dropdown.querySelectorAll('.mention-item').forEach(item => {
-            item.addEventListener('click', () => {
-              insertMention(textarea, item.dataset.name, match[0].length);
-            });
+            item.addEventListener('click', () => { insertMention(textarea, item.dataset.name, match[0].length); });
           });
-        } else {
-          dropdown.style.display = 'none';
-        }
-      } else {
-        dropdown.style.display = 'none';
-      }
+        } else { dropdown.style.display = 'none'; }
+      } else { dropdown.style.display = 'none'; }
     });
-    
     textarea.addEventListener('keydown', (e) => {
       if (dropdown.style.display === 'none') return;
-      
       const items = dropdown.querySelectorAll('.mention-item');
-      if (e.key === 'ArrowDown') {
+      if (e.key === 'ArrowDown') { e.preventDefault(); selectedIndex = Math.min(selectedIndex + 1, items.length - 1); updateSelection(items); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); selectedIndex = Math.max(selectedIndex - 1, 0); updateSelection(items); }
+      else if (e.key === 'Enter' && selectedIndex >= 0) {
         e.preventDefault();
-        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-        updateSelection(items);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        selectedIndex = Math.max(selectedIndex - 1, 0);
-        updateSelection(items);
-      } else if (e.key === 'Enter' && selectedIndex >= 0) {
-        e.preventDefault();
-        const selected = items[selectedIndex];
         const currentMatch = textarea.value.substring(0, textarea.selectionStart).match(/@(\w*)$/);
-        if (currentMatch) {
-          insertMention(textarea, selected.dataset.name, currentMatch[0].length);
-        }
-      } else if (e.key === 'Escape') {
-        dropdown.style.display = 'none';
-      }
+        if (currentMatch) insertMention(textarea, items[selectedIndex].dataset.name, currentMatch[0].length);
+      } else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
     });
-    
-    function updateSelection(items) {
-      items.forEach((item, i) => {
-        item.classList.toggle('selected', i === selectedIndex);
-      });
-    }
-    
+    function updateSelection(items) { items.forEach((item, i) => { item.classList.toggle('selected', i === selectedIndex); }); }
     function insertMention(textarea, name, matchLength) {
       const pos = textarea.selectionStart;
       const before = textarea.value.substring(0, pos - matchLength);
@@ -1183,18 +1280,13 @@
     }
   }
 
-  // Process mentions in text
-  function processMentions(text) {
-    return text.replace(/@(\w+)/g, '<span class="mention-highlight">@$1</span>');
-  }
+  function processMentions(text) { return text.replace(/@(\w+)/g, '<span class="mention-highlight">@$1</span>'); }
 
   async function notifyMentionedUsers(text, postId, postTitle) {
     const mentions = text.match(/@(\w+)/g);
     if (!mentions) return;
-    
     for (const mention of mentions) {
       const username = mention.substring(1);
-      // Find friend with this name
       for (const fid of friends) {
         const snap = await getDoc(doc(db, 'users', fid));
         if (snap.exists() && snap.data().displayName === username) {
@@ -1210,29 +1302,22 @@
     if (!el) return;
     const postSnap = allPosts.find(p => p.id === postId);
     const isOwner = currentUser && postSnap && currentUser.uid === postSnap.authorId;
-    
-    if (!comments.length) { 
-      el.innerHTML = '<span class="meta">No comments yet.</span>'; 
-      return; 
-    }
-    
-    // Separate pinned and regular comments
+    if (!comments.length) { el.innerHTML = '<span class="meta">No comments yet.</span>'; return; }
     let orderedComments = [...comments.map((c, i) => ({ ...c, originalIndex: i }))];
     let pinnedComment = null;
-    
     if (pinnedCommentIndex !== null && pinnedCommentIndex !== undefined) {
       pinnedComment = orderedComments.find(c => c.originalIndex === pinnedCommentIndex);
       orderedComments = orderedComments.filter(c => c.originalIndex !== pinnedCommentIndex);
     }
-    
     const renderComment = (c, isPinned = false) => `
       <div class="comment ${isPinned ? 'pinned' : ''}">
         <span class="author-link" onclick="openProfile('${esc(c.authorId)}','${esc(c.authorName)}')">${esc(c.authorName)}</span>
         ${isPinned ? '<span class="pin-badge">PINNED</span>' : ''}
         <span class="meta"> &bull; ${new Date(c.createdAt).toLocaleString()}</span>
         ${currentUser && currentUser.uid === c.authorId ? `<button class="del-btn" style="margin-left:8px;" onclick="deleteComment(${c.originalIndex})">delete</button>` : ''}
-        ${isOwner && !isPinned ? `<button class="pin-btn" onclick="pinComment(${c.originalIndex})">pin</button>` : ''}
-        ${isOwner && isPinned ? `<button class="pin-btn" onclick="unpinComment()">unpin</button>` : ''}
+        ${hasModPower() && currentUser && currentUser.uid !== c.authorId ? `<button class="del-btn" style="margin-left:6px;" onclick="deleteComment(${c.originalIndex})">delete</button>` : ''}
+        ${(isOwner || isAdmin) && !isPinned ? `<button class="pin-btn" onclick="pinComment(${c.originalIndex})">pin</button>` : ''}
+        ${(isOwner || isAdmin) && isPinned ? `<button class="pin-btn" onclick="unpinComment()">unpin</button>` : ''}
         <div style="margin-top:3px; white-space:pre-wrap;">${processMentions(linkify(esc(c.text)))}</div>
         ${currentUser ? `<div style="margin-top:4px;"><a href="#" onclick="toggleReplyBox(${c.originalIndex}); return false;" style="font-size:11px; color:#666;">reply</a></div>
         <div id="reply-box-${c.originalIndex}" style="display:none; margin-top:4px; position:relative;">
@@ -1241,20 +1326,18 @@
           <button onclick="addReply(${c.originalIndex})">Reply</button>
         </div>` : ''}
         <div id="replies-${c.originalIndex}">
-          ${(c.replies || []).map((r, ri) => `
+          ${(c.replies||[]).map((r, ri) => `
             <div class="reply">
               <span class="author-link" onclick="openProfile('${esc(r.authorId)}','${esc(r.authorName)}')">${esc(r.authorName)}</span>
               <span class="meta"> &bull; ${new Date(r.createdAt).toLocaleString()}</span>
               ${currentUser && currentUser.uid === r.authorId ? `<button class="del-btn" style="margin-left:8px;" onclick="deleteReply(${c.originalIndex},${ri})">delete</button>` : ''}
+              ${hasModPower() && currentUser && currentUser.uid !== r.authorId ? `<button class="del-btn" style="margin-left:6px;" onclick="deleteReply(${c.originalIndex},${ri})">delete</button>` : ''}
               <div style="margin-top:2px; white-space:pre-wrap;">${processMentions(linkify(esc(r.text)))}</div>
             </div>`).join('')}
         </div>
       </div>`;
-    
     let html = '';
-    if (pinnedComment) {
-      html += renderComment(pinnedComment, true);
-    }
+    if (pinnedComment) html += renderComment(pinnedComment, true);
     html += orderedComments.map(c => renderComment(c)).join('');
     el.innerHTML = html;
   }
@@ -1263,23 +1346,21 @@
     const box = document.getElementById(`reply-box-${i}`);
     const isShowing = box.style.display !== 'none';
     box.style.display = isShowing ? 'none' : 'block';
-    if (!isShowing) {
-      setupMentionAutocomplete(`reply-input-${i}`);
-    }
+    if (!isShowing) setupMentionAutocomplete(`reply-input-${i}`);
   };
 
   window.pinComment = async (index) => {
     const ref = doc(db, 'posts', window.currentPostId);
     await updateDoc(ref, { pinnedComment: index });
     const updated = (await getDoc(ref)).data();
-    renderComments(updated.comments || [], window.currentPostId, updated.pinnedComment);
+    renderComments(updated.comments||[], window.currentPostId, updated.pinnedComment);
   };
 
   window.unpinComment = async () => {
     const ref = doc(db, 'posts', window.currentPostId);
     await updateDoc(ref, { pinnedComment: null });
     const updated = (await getDoc(ref)).data();
-    renderComments(updated.comments || [], window.currentPostId, updated.pinnedComment);
+    renderComments(updated.comments||[], window.currentPostId, updated.pinnedComment);
   };
 
   window.addComment = async () => {
@@ -1290,13 +1371,11 @@
     const ref = doc(db, 'posts', window.currentPostId);
     const postData = (await getDoc(ref)).data();
     await updateDoc(ref, { comments: arrayUnion({ authorId: currentUser.uid, authorName: name, text, createdAt: Date.now(), replies: [] }) });
-    
     await createNotification(postData.authorId, `${name} commented on your post: "${postData.title}"`, window.currentPostId);
     await notifyMentionedUsers(text, window.currentPostId, postData.title);
-    
     document.getElementById('comment-input').value = '';
     const updated = (await getDoc(ref)).data();
-    renderComments(updated.comments || [], window.currentPostId, updated.pinnedComment);
+    renderComments(updated.comments||[], window.currentPostId, updated.pinnedComment);
     setupMentionAutocomplete('comment-input');
   };
 
@@ -1304,16 +1383,13 @@
     if (!confirm('Delete this comment?')) return;
     const ref = doc(db, 'posts', window.currentPostId);
     const data = (await getDoc(ref)).data();
-    const comments = [...(data.comments || [])];
+    const comments = [...(data.comments||[])];
     comments.splice(index, 1);
-    
-    // Adjust pinned comment index if needed
     let newPinnedIndex = data.pinnedComment;
     if (newPinnedIndex !== null && newPinnedIndex !== undefined) {
       if (newPinnedIndex === index) newPinnedIndex = null;
       else if (newPinnedIndex > index) newPinnedIndex--;
     }
-    
     await updateDoc(ref, { comments, pinnedComment: newPinnedIndex });
     renderComments(comments, window.currentPostId, newPinnedIndex);
   };
@@ -1325,14 +1401,12 @@
     const name = snap.exists() ? snap.data().displayName : currentUser.email;
     const ref = doc(db, 'posts', window.currentPostId);
     const data = (await getDoc(ref)).data();
-    const comments = [...(data.comments || [])];
+    const comments = [...(data.comments||[])];
     if (!comments[commentIndex].replies) comments[commentIndex].replies = [];
     comments[commentIndex].replies.push({ authorId: currentUser.uid, authorName: name, text, createdAt: Date.now() });
     await updateDoc(ref, { comments });
-    
     await createNotification(comments[commentIndex].authorId, `${name} replied to your comment on "${data.title}"`, window.currentPostId);
     await notifyMentionedUsers(text, window.currentPostId, data.title);
-    
     document.getElementById(`reply-input-${commentIndex}`).value = '';
     renderComments(comments, window.currentPostId, data.pinnedComment);
   };
@@ -1341,7 +1415,7 @@
     if (!confirm('Delete this reply?')) return;
     const ref = doc(db, 'posts', window.currentPostId);
     const data = (await getDoc(ref)).data();
-    const comments = [...(data.comments || [])];
+    const comments = [...(data.comments||[])];
     comments[commentIndex].replies.splice(replyIndex, 1);
     await updateDoc(ref, { comments });
     renderComments(comments, window.currentPostId, data.pinnedComment);
@@ -1350,70 +1424,84 @@
   // --- Profile ---
   window.openProfile = async (uid, name) => {
     closeModal('modal-bg');
-    
     document.getElementById('profile-body').innerHTML = '<span class="meta">Loading...</span>';
     document.getElementById('profile-bg').style.display = 'block';
-
     const userSnap = await getDoc(doc(db, 'users', uid));
     const userData = userSnap.exists() ? userSnap.data() : {};
     const displayName = userData.displayName || name;
     const bio = userData.bio || '';
     const profileColor = userData.profileColor || '#6b8e23';
     const joinedDate = userData.createdAt ? new Date(userData.createdAt.seconds * 1000).toLocaleDateString() : 'Unknown';
-    const followerCount = (userData.followers || []).length;
-    const followingCount = (userData.following || []).length;
-
+    const followerCount = (userData.followers||[]).length;
+    const followingCount = (userData.following||[]).length;
     const userPosts = allPosts.filter(p => p.authorId === uid);
     const postCount = userPosts.length;
-    
     let commentCount = 0;
     for (const post of allPosts) {
       if (post.comments) {
         for (const comment of post.comments) {
           if (comment.authorId === uid) commentCount++;
-          if (comment.replies) {
-            for (const reply of comment.replies) {
-              if (reply.authorId === uid) commentCount++;
-            }
-          }
+          if (comment.replies) for (const reply of comment.replies) if (reply.authorId === uid) commentCount++;
         }
       }
     }
-    
     let totalScore = 0;
-    for (const post of userPosts) {
-      totalScore += (post.upvotes?.length || 0) - (post.downvotes?.length || 0);
-    }
-    
+    for (const post of userPosts) totalScore += (post.upvotes?.length||0) - (post.downvotes?.length||0);
     const recent = userPosts.slice(0, 3);
     const initials = displayName.substring(0, 2).toUpperCase();
-    
-    // Friend status
     const isSelf = currentUser && currentUser.uid === uid;
     const isFriend = friends.includes(uid);
     const hasSentRequest = friendRequests.sent.includes(uid);
     const hasReceivedRequest = friendRequests.received.includes(uid);
     const isFollowing = following.includes(uid);
     
-    let friendButton = '';
-    let followButton = '';
-    if (!isSelf) {
-      // Follow button
-      if (isFollowing) {
-        followButton = `<button onclick="unfollowUser('${uid}')" style="background:#888; color:white;">Unfollow</button>`;
-      } else {
-        followButton = `<button onclick="followUser('${uid}', '${esc(displayName)}')" style="background:#4682b4; color:white;">Follow</button>`;
-      }
+    // Target user's role info
+    const targetIsMod = !!userData.isMod;
+    // Check if the target profile is the admin (by stored email or known UID)
+    const targetIsAdmin = (uid === window._adminUid) || (userData.email === ADMIN_EMAIL);
+    
+    // Ban status
+    const banUntil = userData.bannedUntil;
+    const isBanned = banUntil && (banUntil === 'forever' || banUntil > Date.now());
+    let banInfo = '';
+    if (isBanned) {
+      const until = banUntil === 'forever' ? 'Permanently banned' : `Banned until ${new Date(banUntil).toLocaleString()}`;
+      banInfo = `<div style="background:#ffeeee; border:1px solid #cc0000; padding:6px; margin-bottom:8px; font-size:12px; color:#aa0000;">🚫 ${until}${userData.banReason ? ` — "${userData.banReason}"` : ''}</div>`;
+    }
+
+    let friendButton = '', followButton = '', adminButtons = '';
+    if (!isSelf && currentUser) {
+      followButton = isFollowing
+        ? `<button onclick="unfollowUser('${uid}')" style="background:#888; color:white;">Unfollow</button>`
+        : `<button onclick="followUser('${uid}', '${esc(displayName)}')" style="background:#4682b4; color:white;">Follow</button>`;
+      if (isFriend) friendButton = `<button onclick="removeFriend('${uid}')" style="background:#cc0000; color:white;">Remove Friend</button>`;
+      else if (hasSentRequest) friendButton = `<button disabled>Request Sent</button>`;
+      else if (hasReceivedRequest) friendButton = `<button onclick="acceptFriendRequest('${uid}')" style="background:#228b22; color:white;">Accept Request</button> <button onclick="declineFriendRequest('${uid}')">Decline</button>`;
+      else friendButton = `<button onclick="sendFriendRequest('${uid}', '${esc(displayName)}')">Add Friend</button>`;
       
-      // Friend button
-      if (isFriend) {
-        friendButton = `<button onclick="removeFriend('${uid}')" style="background:#cc0000; color:white;">Remove Friend</button>`;
-      } else if (hasSentRequest) {
-        friendButton = `<button disabled>Request Sent</button>`;
-      } else if (hasReceivedRequest) {
-        friendButton = `<button onclick="acceptFriendRequest('${uid}')" style="background:#228b22; color:white;">Accept Request</button> <button onclick="declineFriendRequest('${uid}')">Decline</button>`;
-      } else {
-        friendButton = `<button onclick="sendFriendRequest('${uid}', '${esc(displayName)}')">Add Friend</button>`;
+      if (isAdmin) {
+        if (isBanned) {
+          adminButtons = `<button onclick="unbanUser('${uid}', '${esc(displayName)}')" style="background:#228b22; color:white; margin-left:6px;">Unban User</button>`;
+        } else {
+          adminButtons = `<button onclick="openBanModal('${uid}', '${esc(displayName)}')" style="background:#8b0000; color:white; margin-left:6px;">🚫 Ban User</button>`;
+        }
+        // Admin-only: mod/unmod controls (can't mod another admin)
+        if (!targetIsAdmin) {
+          if (targetIsMod) {
+            adminButtons += ` <button onclick="removeMod('${uid}', '${esc(displayName)}')" style="background:#555; color:white; margin-left:6px;">Remove Mod</button>`;
+          } else {
+            adminButtons += ` <button onclick="makeMod('${uid}', '${esc(displayName)}')" style="background:#1a6b1a; color:white; margin-left:6px;">🛡️ Make Mod</button>`;
+          }
+        }
+      } else if (isMod) {
+        // Mods can ban/unban but NOT mod/unmod others, and can't touch other mods or admin
+        if (!targetIsAdmin && !targetIsMod) {
+          if (isBanned) {
+            adminButtons = `<button onclick="unbanUser('${uid}', '${esc(displayName)}')" style="background:#228b22; color:white; margin-left:6px;">Unban User</button>`;
+          } else {
+            adminButtons = `<button onclick="openBanModal('${uid}', '${esc(displayName)}')" style="background:#8b0000; color:white; margin-left:6px;">🚫 Ban User</button>`;
+          }
+        }
       }
     }
 
@@ -1422,28 +1510,19 @@
         <div class="profile-avatar" style="background:${profileColor};">${initials}</div>
         <div>
           <b style="font-size:18px;">${esc(displayName)}</b>
+          ${targetIsAdmin ? '<span class="admin-badge">ADMIN</span>' : ''}
+          ${targetIsMod && !targetIsAdmin ? '<span class="mod-badge">MOD</span>' : ''}
           <div class="meta">Joined ${joinedDate}</div>
         </div>
       </div>
-      ${followButton || friendButton ? `<div style="margin-bottom:12px;">${followButton} ${friendButton}</div>` : ''}
+      ${banInfo}
+      ${followButton || friendButton || adminButtons ? `<div style="margin-bottom:12px;">${followButton} ${friendButton} ${adminButtons}</div>` : ''}
       ${bio ? `<div class="profile-bio">"${esc(bio)}"</div>` : ''}
       <div class="profile-stats">
-        <div class="profile-stat">
-          <div class="profile-stat-value">${postCount}</div>
-          <div class="profile-stat-label">Posts</div>
-        </div>
-        <div class="profile-stat">
-          <div class="profile-stat-value">${commentCount}</div>
-          <div class="profile-stat-label">Comments</div>
-        </div>
-        <div class="profile-stat">
-          <div class="profile-stat-value">${followerCount}</div>
-          <div class="profile-stat-label">Followers</div>
-        </div>
-        <div class="profile-stat">
-          <div class="profile-stat-value">${totalScore}</div>
-          <div class="profile-stat-label">Score</div>
-        </div>
+        <div class="profile-stat"><div class="profile-stat-value">${postCount}</div><div class="profile-stat-label">Posts</div></div>
+        <div class="profile-stat"><div class="profile-stat-value">${commentCount}</div><div class="profile-stat-label">Comments</div></div>
+        <div class="profile-stat"><div class="profile-stat-value">${followerCount}</div><div class="profile-stat-label">Followers</div></div>
+        <div class="profile-stat"><div class="profile-stat-value">${totalScore}</div><div class="profile-stat-label">Score</div></div>
       </div>
       <b>Recent Posts</b>
       <div style="margin-top:6px;">
@@ -1456,11 +1535,11 @@
     `;
   };
 
-  window.viewOwnProfile = () => {
-    if (currentUser) {
-      openProfile(currentUser.uid, currentUserName);
-    }
-  };
+  const ADMIN_UID_REF = { uid: null };
+  // Store admin email reference for profile display
+  window.ADMIN_EMAIL_CONST = ADMIN_EMAIL;
+
+  window.viewOwnProfile = () => { if (currentUser) openProfile(currentUser.uid, currentUserName); };
 
   // --- Helpers ---
   window.closeModal = (id) => {
@@ -1474,12 +1553,10 @@
     if (e.target.id === 'name-bg') closeModal('name-bg');
     if (e.target.id === 'notif-bg') closeModal('notif-bg');
     if (e.target.id === 'edit-profile-bg') closeModal('edit-profile-bg');
-    
-    // Close mention dropdown when clicking outside
+    if (e.target.id === 'ban-modal-bg') closeModal('ban-modal-bg');
+    if (e.target.id === 'news-modal-bg') closeModal('news-modal-bg');
     const dropdown = document.getElementById('mention-dropdown');
-    if (dropdown && !e.target.closest('textarea') && !e.target.closest('.mention-dropdown')) {
-      dropdown.style.display = 'none';
-    }
+    if (dropdown && !e.target.closest('textarea') && !e.target.closest('.mention-dropdown')) dropdown.style.display = 'none';
   };
 
   function showErr(elId, msg) {
@@ -1493,12 +1570,9 @@
     toast.className = 'success-toast';
     toast.textContent = message;
     document.body.appendChild(toast);
-    
     setTimeout(() => {
       toast.style.animation = 'slideOut 0.3s ease-out';
-      setTimeout(() => {
-        document.body.removeChild(toast);
-      }, 300);
+      setTimeout(() => { document.body.removeChild(toast); }, 300);
     }, 2000);
   }
 
