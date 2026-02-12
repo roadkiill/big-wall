@@ -86,7 +86,7 @@
   <!-- Friends Sidebar -->
   <div id="sidebar" style="display:none;">
     <div class="friends-box">
-      <b style="font-size: 14px;">Friends</b>
+      <b style="font-size: 14px;">Friends List</b>
       <hr>
       <div id="friends-list"></div>
     </div>
@@ -95,7 +95,7 @@
   <div id="wrap">
     <div class="box">
       <h1>BIG WALL</h1>
-      <span class="meta">The classic forum &mdash; post anything</span>
+      <span class="meta">Tell your friend to look at The Wall</span>
     </div>
 
     <!-- auth bar with notifications -->
@@ -122,13 +122,13 @@
       <input type="password" id="auth-pass">
       <button onclick="submitAuth()" id="auth-btn">Sign In</button>
       &nbsp;
-      <span class="meta" id="toggle-msg">No account?</span>
+      <span class="meta" id="toggle-msg">Are you a loser/No account?</span>
       <a href="#" onclick="toggleMode(); return false;" id="toggle-link">Register</a>
     </div>
 
     <!-- new post -->
     <div id="post-box" class="box" style="display:none;">
-      <b>New Post</b>
+      <b>Make a Post</b>
       <hr>
       <label>Title</label>
       <input type="text" id="post-title" maxlength="500">
@@ -211,8 +211,8 @@
     <div style="text-align:right;"><a href="#" onclick="closeModal('edit-profile-bg'); return false;">[close]</a></div>
     <b>Edit Profile</b>
     <hr>
-    <label>Bio (max 200 characters)</label>
-    <textarea id="bio-input" maxlength="200" style="min-height:80px;" placeholder="Tell us about yourself..."></textarea>
+    <label>Bio (max 500 characters)</label>
+    <textarea id="bio-input" maxlength="500" style="min-height:80px;" placeholder="Tell us about yourself..."></textarea>
     <div class="meta" style="text-align:right; margin-top:-4px; margin-bottom:6px;"><span id="bio-count">0</span>/200</div>
     <label>Profile Color</label>
     <select id="color-input">
