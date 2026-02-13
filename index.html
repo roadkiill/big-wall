@@ -754,23 +754,12 @@
   // --- Presence System ---
 function startPresenceTracking(uid) {
   const userRef = doc(db, 'users', uid);
-  
-  // Write immediately on load
   updateDoc(userRef, { lastSeen: Date.now() });
-  
-  // Update every 60 seconds while tab is open
+  // ONLY update every 5 minutes, not on every mouse movement
   setInterval(() => {
     updateDoc(userRef, { lastSeen: Date.now() });
-  }, 60000);
-  
-  // Update on any user activity
-  ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(event => {
-    document.addEventListener(event, () => {
-      updateDoc(userRef, { lastSeen: Date.now() });
-    }, { passive: true, capture: false });
-  });
+  }, 300000);
 }
-
 function isOnline(lastSeen) {
   if (!lastSeen) return false;
   // Consider online if active within last 2 minutes
