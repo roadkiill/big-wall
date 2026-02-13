@@ -64,17 +64,6 @@
     #editor-container { background: white; border: 1px solid #999; margin-bottom: 6px; min-height: 200px; }
     .ql-editor { min-height: 200px; }
     .ql-toolbar { background: #f5f4f0; border-bottom: 1px solid #999 !important; }
-
-    .kofi-btn {
-      width: 300px;
-      transition: transform 0.2s ease, filter 0.2s ease;
-      cursor: pointer;
-    }
-
-    .kofi-btn:hover {
-      transform: scale(1.08);
-      filter: drop-shadow(0 0 10px rgba(255, 0, 100, 0.6));
-    }
     
     /* Post content rendering */
     .post-content { background: white; padding: 12px; border: 1px solid #ccc; margin: 10px 0; line-height: 1.6; }
@@ -101,6 +90,28 @@
     .presence-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; flex-shrink: 0; }
     .presence-dot.online { background: #22cc44; box-shadow: 0 0 4px #22cc44; }
     .presence-dot.offline { background: #999; }
+
+    .kofi-btn {
+      width: 300px;
+      transition: transform 0.2s ease, filter 0.2s ease;
+      cursor: pointer;
+    }
+
+    .kofi-btn:hover {
+      transform: scale(1.08);
+      filter: drop-shadow(0 0 10px rgba(255, 0, 100, 0.6));
+    }
+
+    .kofi-btn2 {
+      width: 250px;
+      transition: transform 0.2s ease, filter 0.2s ease;
+      cursor: pointer;
+    }
+
+    .kofi-btn2:hover {
+      transform: scale(1.08);
+      filter: drop-shadow(0 0 10px rgba(255, 0, 100, 0.6));
+    }
 
 
     /* NEWS SIDEBAR */
@@ -204,7 +215,7 @@
   </div>
 </div>
 
-<div id="quota-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+<div id="quota-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
   <div style="background:#eae8e0; border:3px solid #c52b16; padding:30px; max-width:480px; text-align:center; margin:20px;">
     <div style="font-size:48px; margin-bottom:12px;">( O_O)</div>
     <h1 style="color:#b10d0d; font-size:28px; margin:0 0 16px 0;">The servers are cooked lol</h1>
@@ -215,22 +226,32 @@
       <img src="KofiSupportButton.png" alt="Support me on Ko-fi (pretty please)" class="kofi-btn">
     </a>
     <div class="meta" style="font-size:11px;">Quota resets at midnight PST</div>
+    <button onclick="retryConnection()" style="margin-top:16px; padding:8px 20px; font-size:14px;">Try Again</button>
   </div>
 </div>
+
 
 <!-- Main site (hidden for banned users) -->
 <div id="main-site">
 <div id="outer-container">
   <!-- NEWS SIDEBAR (left) -->
-  <div id="news-sidebar">
-    <div class="news-box">
-      <b>News</b>
-      <hr style="border-color: #555; margin: 6px 0;">
-      <div class="news-scroll" id="news-list">
-        <span style="color:#999; font-size:11px;">Loading news...</span>
-      </div>
+<!-- NEWS SIDEBAR (left) -->
+<div id="news-sidebar">
+  <div class="news-box">
+    <b>News</b>
+    <hr style="border-color: #555; margin: 6px 0;">
+    <div class="news-scroll" id="news-list">
+      <span style="color:#999; font-size:11px;">Loading news...</span>
     </div>
   </div>
+
+  <!-- Ko-fi Support Button -->
+  <div style="text-align:center; margin-top:8px;">
+    <a href="https://ko-fi.com/road_kiill" target="_blank">
+      <img src="KofiSupportButton.png" alt="Support me on Ko-fi" class="kofi-btn2">
+    </a>
+  </div>
+</div>
 
   <div id="container">
     <!-- Friends Sidebar -->
@@ -450,7 +471,12 @@
   </div>
 </div>
 
-<!-- Quill.js -->
+
+
+<!-- -----  ------  ----- -->
+<!-- ----- Quill.js ----- -->
+<!-- -----  ------  ----- -->
+
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 
 <script type="module">
@@ -494,6 +520,29 @@
   let currentDMRecipient = null;
   let dmUnsubscribe = null;
   let blockedUsers = [];
+
+  // --- Check if Firebase's tummy is full ---
+  function checkQuotaError(error) {
+    if (error && error.code === 'resource-exhausted') {
+      const screen = document.getElementById('quota-screen');
+      screen.style.display = 'flex'; // Now this will work correctly
+    }
+  }
+
+  // Add this as a global function
+  window.retryConnection = async () => {
+    try {
+      const testQuery = query(collection(db, 'posts'), limit(1));
+      await getDocs(testQuery);
+      document.getElementById('quota-screen').style.display = 'none';
+      location.reload();
+    } catch (e) {
+      if (e.code === 'resource-exhausted') {
+        alert('Quota still exceeded. Please try again later.');
+      }
+    }
+  };
+
 
   // --- Role checks ---
   function checkAdmin(user) { return user && user.email === ADMIN_EMAIL; }
@@ -779,12 +828,23 @@
   // --- Presence System ---
 function startPresenceTracking(uid) {
   const userRef = doc(db, 'users', uid);
+  
+  // Write immediately on load
   updateDoc(userRef, { lastSeen: Date.now() });
-  // ONLY update every 5 minutes, not on every mouse movement
+  
+  // Update every 60 seconds while tab is open
   setInterval(() => {
     updateDoc(userRef, { lastSeen: Date.now() });
-  }, 300000);
+  }, 60000);
+  
+  // Update on any user activity
+  ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(event => {
+    document.addEventListener(event, () => {
+      updateDoc(userRef, { lastSeen: Date.now() });
+    }, { passive: true, capture: false });
+  });
 }
+
 function isOnline(lastSeen) {
   if (!lastSeen) return false;
   // Consider online if active within last 2 minutes
@@ -975,7 +1035,7 @@ async function renderFriendsList() {
       else { badge.style.display = 'none'; }
     }, (error) => checkQuotaError(error));
   }
-  
+
   window.openNotifications = async () => {
     document.getElementById('notif-body').innerHTML = '<span class="meta">Loading...</span>';
     document.getElementById('notif-bg').style.display = 'block';
@@ -1198,7 +1258,7 @@ async function renderFriendsList() {
     applyFilters();
     renderFriendsList();
   }, (error) => checkQuotaError(error));
-  
+
   window.createPost = async () => {
     const title = document.getElementById('post-title').value.trim();
     const contentHTML = quill.root.innerHTML;
