@@ -777,22 +777,25 @@ function isOnline(lastSeen) {
   return (Date.now() - lastSeen) < 120000;
 }
 
+const friendCache = {};
+
 async function renderFriendsList() {
   const el = document.getElementById('friends-list');
   if (!friends.length) { el.innerHTML = '<span class="meta">No friends yet</span>'; return; }
   const friendsData = await Promise.all(friends.map(async (fid) => {
-    const userSnap = await getDoc(doc(db, 'users', fid));
-    if (!userSnap.exists()) return null;
-    const userData = userSnap.data();
+    // Only fetch from Firestore if not already cached
+    if (!friendCache[fid]) {
+      const userSnap = await getDoc(doc(db, 'users', fid));
+      if (!userSnap.exists()) return null;
+      friendCache[fid] = userSnap.data();
+    }
+    const userData = friendCache[fid];
     const userPosts = allPosts.filter(p => p.authorId === fid);
     const recentPost = userPosts.length > 0 ? userPosts[0].title : 'No posts yet';
     const online = isOnline(userData.lastSeen);
     return { id: fid, name: userData.displayName, recentPost, online };
   }));
-  
-  // Sort: online friends first
   const sorted = friendsData.filter(f => f).sort((a, b) => b.online - a.online);
-  
   el.innerHTML = sorted.map(f => `
     <div class="friend-item" onclick="openProfile('${f.id}', '${esc(f.name)}')">
       <div style="display:flex; align-items:center; gap:4px;">
